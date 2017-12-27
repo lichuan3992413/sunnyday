@@ -1,0 +1,12 @@
+package com.hskj.iservice;
+
+import javax.servlet.http.HttpServletRequest;
+
+import com.hskj.form.HSResponse;
+
+public interface ISolver {
+	public String doSolver(HttpServletRequest request);
+	public String translateErrorCode(HSResponse response);
+	public String getTargetName();
+
+}

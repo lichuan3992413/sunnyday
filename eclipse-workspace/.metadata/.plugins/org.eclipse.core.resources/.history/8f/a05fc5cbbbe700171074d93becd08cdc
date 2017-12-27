@@ -1,0 +1,277 @@
+package sunnyday.tools.util;
+
+import java.net.NetworkInterface;
+import java.net.SocketException;
+import java.util.Enumeration;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+
+import org.slf4j.Logger;
+
+import com.hskj.datacenter.cache.GateConfigCache;
+import com.hskj.log.CommonLogFactory;
+
+public class UtilTool {
+	
+	private static final Logger log = CommonLogFactory.getLog("infoLog");
+	
+	private static final String MOBILE_LETTER = "X" ;
+	public final static Lock lock = new ReentrantLock();
+	public final static Lock lock2 = new ReentrantLock();
+	// private final static int TEAM = 100 ;
+
+	public static boolean isFilterMobile(){
+		String tmp= GateConfigCache.getValue(ParamUtil.IS_FILTET_MOBILE);
+		if(tmp!=null&&"no".equals(tmp)){
+			return false;
+		}
+		return true;
+	}
+	public static String filterMobile(final String  mobile) {
+		String tmp= mobile;
+		if(mobile!=null&&isFilterMobile()){
+			if(mobile.length()>=11){
+				int end = mobile.length() - 4 ;
+				int start = mobile.length() - 8;
+				tmp = mobile.substring(0, start)+getLitter(4)+mobile.substring(end, mobile.length());
+			}else if (mobile.length()>=8){
+				int end = mobile.length() - 3 ;
+				int start = mobile.length() - 6;
+				tmp = mobile.substring(0, start)+getLitter(3)+mobile.substring(end, mobile.length());
+			}else if (mobile.length()>=5){
+				int end = mobile.length() - 2 ;
+				int start = mobile.length() - 4;
+				tmp = mobile.substring(0, start)+getLitter(2)+mobile.substring(end, mobile.length());
+			}
+		}
+		return tmp ;
+	}
+	
+	public static  String getLitter(int count){
+		StringBuffer sb = new StringBuffer();
+		for(int i=0;i<count;i++){
+			sb.append(MOBILE_LETTER);
+		}
+		return sb.toString();
+	}
+
+	public static String getMobileTeamNum(String mobile) {
+		String team="130000";
+		if(mobile!=null&&mobile.length()>6){
+			team = mobile.substring(0,6);
+		}
+		return team;
+	}
+	public static String getSmsTeamNum(String send_time) {
+		String team="2016-05-18-04:43";
+		if(send_time!=null&&send_time.length()>16){
+			team = send_time.substring(0,16).replace(" ", "-");
+		}
+		return team;
+	}
+ 
+	public static String getLocalMac() {
+		StringBuffer sb = new StringBuffer();
+		try {
+			Enumeration<NetworkInterface> enu = NetworkInterface.getNetworkInterfaces();
+			while (enu.hasMoreElements()) {
+				NetworkInterface networkInterface = (NetworkInterface) enu.nextElement();
+				if (networkInterface != null) {
+					byte[] mac = networkInterface.getHardwareAddress();
+					String name = networkInterface.getName();
+					if (mac != null && name.startsWith("eth")) {
+						sb.append(getLocalMac(mac));
+						break;
+					}
+				}
+			}
+		} catch (Exception e) {
+			log.error("", e);
+		}
+
+		return sb.toString();
+	}
+
+	private static String getLocalMac(byte[] mac) throws SocketException {
+		// 获取网卡，获取地址
+		StringBuffer sb = new StringBuffer("");
+		for (int i = 0; i < mac.length; i++) {
+			if (i != 0) {
+				// sb.append("-");
+			}
+			// 字节转换为整数
+			int temp = mac[i] & 0xff;
+			String str = Integer.toHexString(temp);
+			if (str.length() == 1) {
+				sb.append("0" + str);
+			} else {
+				sb.append(str);
+			}
+		}
+		return sb.toString().toUpperCase();
+
+	}
+
+	/**
+	 * 状态报告，匹配分组数
+	 * 
+	 * @return
+	 */
+	public static int getTeamCount() {
+		int result = 100;
+		String s = GateConfigCache.getValue("team_count");
+		if (s != null && !"".equals(s)) {
+			try {
+				result = Integer.parseInt(s);
+			} catch (Exception e) {
+			}
+		}
+		return result;
+	}
+
+	/**
+	 * 获取处理下发记录超时时长
+	 * 
+	 * @return
+	 */
+	public static int getDealSubmitFnInRedisTimeOut() {
+		int result = 1800000;
+		String s = GateConfigCache.getValue("deal_submitFn_in_redis_timeOut");
+		if (s != null && !"".equals(s)) {
+			try {
+				result = Integer.parseInt(s);
+			} catch (Exception e) {
+			}
+		}
+		return result;
+	}
+
+	/**
+	 * 获取处理处理状态报告超时时长
+	 * @return
+	 */
+	public static int getDealReportInRedisTimeOut() {
+		int result = 1800000;
+		String s = GateConfigCache.getValue("deal_report_in_redis_timeOut");
+		if (s != null && !"".equals(s)) {
+			try {
+				result = Integer.parseInt(s);
+			} catch (Exception e) {
+			}
+		}
+		return result;
+	}
+	
+	/**
+	 * 获取处理处理状态报告超时时长
+	 * @return
+	 */
+	public static String getBIFilePath() {
+		String result = "/hskj/bi_file/sendHistory";
+		String s = GateConfigCache.getValue("bi.file_path");
+		if (s != null && !"".equals(s)) {
+			try {
+				result = s;
+			} catch (Exception e) {
+			}
+		}
+		return result;
+	}
+	/**
+	 * 输出BI服务器ID
+	 * @return
+	 */
+	public static String getBIServerId() {
+		String result = "148";
+		String s = GateConfigCache.getValue("bi.serverId");
+		if (s != null && !"".equals(s)) {
+			try {
+				result = s;
+			} catch (Exception e) {
+			}
+		}
+		return result;
+	}
+	/**
+	 * 服务器协议类型：CM SG SM cluster
+	 * @return
+	 */
+	public static String getBIProtocal() {
+		String result = "cluster";
+		String s = GateConfigCache.getValue("bi.protocal");
+		if (s != null && !"".equals(s)) {
+			try {
+				result = s;
+			} catch (Exception e) {
+			}
+		}
+		return result;
+	}
+	
+	/**
+	 * 	#传输协议版本
+	 * @return
+	 */
+	public static String getBIVersion() {
+		String result = "30";
+		String s = GateConfigCache.getValue("bi.version");
+		if (s != null && !"".equals(s)) {
+			try {
+				result = s;
+			} catch (Exception e) {
+			}
+		}
+		return result;
+	}
+	/**
+	 * BI文件输出频率
+	 * @return
+	 */
+	public static String getBITimeInterval() {
+		String result = "2500";
+		String s = GateConfigCache.getValue("bi.timeInterval");
+		if (s != null && !"".equals(s)) {
+			try {
+				result = s;
+			} catch (Exception e) {
+			}
+		}
+		return result;
+	}
+	
+	/**
+	 * 重复过滤使用的模式 redis/memcache
+	 * 默认 memcache
+	 * @return
+	 */
+	public static String getFilterType() {
+		String result = "memcache";
+		String s = GateConfigCache.getValue("filter_type");
+		if (s != null && !"".equals(s)) {
+			try {
+				result = s;
+			} catch (Exception e) {
+			}
+		}
+		return result;
+	}
+	
+	/**
+	 * 判断超时重试次数
+	 * @return
+	 */
+	public static int getTimeOutTryTimes() {
+		int result = 0;
+		String s = GateConfigCache.getValue("timeOut_try_times");
+		if (s != null && !"".equals(s)) {
+			try {
+				result = Integer.parseInt(s.trim());
+			} catch (Exception e) {
+			}
+		}
+		return result;
+	}
+	
+			
+		
+}

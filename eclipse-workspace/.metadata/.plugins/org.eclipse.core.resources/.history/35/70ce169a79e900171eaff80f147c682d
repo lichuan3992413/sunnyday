@@ -1,0 +1,5 @@
+[NAME]   	    [TYPE]
+TradeCode       Char(4)
+ReturnCode      Char(2)
+ErrorMsg        Char(30)
+FlowNo          Char(20)

@@ -1,0 +1,476 @@
+package com.hskj.rao;
+
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import javax.annotation.Resource;
+
+import org.apache.commons.lang.StringUtils;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Repository;
+
+import com.hskj.adapter.DC_Adapter;
+import com.hskj.form.SubmitMessageArriveReply;
+
+import redis.clients.jedis.Jedis;
+import redis.clients.jedis.Pipeline;
+import sunnyday.adapter.redis.impl.Utils;
+import sunnyday.common.model.CheckMethod;
+import sunnyday.common.model.LocationInfo;
+import sunnyday.common.model.NetSwitchedMobileInfo;
+import sunnyday.common.model.TdInfo;
+import sunnyday.common.model.UserBalanceForm;
+import sunnyday.common.model.UserBean;
+import sunnyday.tools.util.ConnectUtil;
+
+@Repository
+public class GateRAO extends CommonRAO {
+	@Resource(name = "redisGate")
+	protected DCAdapter dc;
+	
+	@Value("#{config.must_arrive_valid_time}")
+	private String must_arrive_valid_time;
+	
+	protected DCAdapter getDc() {
+		return dc;
+	}
+	
+	public void updateDataCenterUserInfoCache(Map<String, Map<String, UserBean>> cacheMode) {
+		getDc().putCacheData(cacheMode);
+	}
+
+	public void updateDataCenterNetSwitchedMobileInfoCache(Map<String, Map<String, NetSwitchedMobileInfo>> numberPortability) {
+		getDc().putCacheData(numberPortability);
+	}
+
+	public void updateDataCenterLocationInfoCache(Map<String, Map<String, LocationInfo>> locationInfo) {
+		getDc().putCacheData(locationInfo);
+	}
+
+	public void updateDataCenterCheckMethodCache(Map<String, List<CheckMethod>> checkMethod) {
+		getDc().putCacheData(checkMethod);
+	}
+	
+	public void updateDataCenterTdInfoCache(Map<String, Map<String, TdInfo>> tdInfo) {
+		getDc().putCacheData(tdInfo);
+	}
+	
+	
+	
+	
+	public void updateGateConfigCache(Map<String, Map<String, String>> gateConfig) {
+		getDc().putCacheData(gateConfig);
+	}
+
+	 
+	public void updateCacheData(Map<String, ?>  map) {
+		getDc().putCacheData(map);
+	}
+
+
+	
+	/**
+	 * 得到redis中所有的余额信息
+	 * @return
+	 */
+	public List<UserBalanceForm> getCurrentDcBalanceList() {
+		List<UserBalanceForm> result = new ArrayList<UserBalanceForm>(); 
+		try{
+			Set<String> keySet = HSSmembers("keys:balance");
+			for(String each : keySet){
+				Map<String, String> tmp = HSHgetAll(each);
+				if(!tmp.isEmpty()){
+					UserBalanceForm ubf = new UserBalanceForm();  
+					for(String field : tmp.keySet() ){
+						String str = tmp.get(field);
+						Method m = UserBalanceForm.class.getMethod("set" + Utils.FirstUpperCase(new String(field)), String.class);
+						m.invoke(ubf, str);
+					}
+					result.add(ubf);
+				}
+			}
+			 
+		}catch(Exception e){
+			log.info("",e);
+		} 
+		return result;
+	}
+	
+	public void updateDataUserUserBalance(List<UserBalanceForm> dcUpdateList) {
+		//待写：将last_balance更新到数据中心，将add_balance增加到cur_balance。
+		if(dcUpdateList != null && dcUpdateList.size() > 0){
+			String[] fields = new String[]{"last_balance"};
+			Map<String, UserBalanceForm> cache = new HashMap<String, UserBalanceForm>();
+			for(UserBalanceForm each : dcUpdateList){
+				cache.put("balance:" + each.getUser_id(), each);
+			}
+//			System.out.println("将更新到数据中心，将add_balance增加到cur_balance ： " + cache);
+			getDc().updateCachesValueInStringMode(fields, cache);
+			//充值
+			getDc().rechargingByBatch(dcUpdateList);
+		}
+	}
+	
+	public void updateUserUserBalance(UserBalanceForm each) {
+		try {
+			String key = "balance:" + each.getUser_id();
+			String field_last_balance = "last_balance";
+			String field_diffBalance = "diffBalance";
+			double increment_add_balance = each.getAdd_balance();
+			double increment_changeBalance = -each.getChangeBalance();
+			double now_cur_balance = HSHINCRBYFLOAT(key, field_last_balance, increment_add_balance);
+			double now_diff_balance = HSHINCRBYFLOAT(key, field_diffBalance, increment_changeBalance);
+			if (Math.abs(now_cur_balance - each.getCur_balance()) < 1.0E-5) {
+				log_info.info("[" + each.getUser_id() + "]余额同步失败，期望值为[" + each.getCur_balance() + "]，实际值为[" + now_cur_balance + "]，同步期间余额变动为[" + now_diff_balance + "]");
+				long result = HSHSet(key, field_last_balance, each.getCur_balance());
+				log_info.info("[" + each.getUser_id() + "]余额同步重置为[" + each.getCur_balance() + "],结果：" + result);
+			}
+		} catch (Exception e) {
+			log.error("updateUserUserBalance" + each, e);
+		}
+		 
+	}
+	
+	 
+	
+	public Object getCacheData(String key){
+		return  dc.getCacheData(key);
+	}
+	public void addNewUserBalanceToDC(Map<String, ?> cacheMap) {
+		try{
+			for (String eachKey : cacheMap.keySet()) {
+				Object cache = cacheMap.get(eachKey);
+				Field[] fields = cache.getClass().getDeclaredFields();
+				Map<String, String> hash = new HashMap<String, String>();
+				for (Field eachField : fields) {
+					String strValue;
+					try {
+						Class<?>[] cs = null;
+						Object[] params = null; 
+						Method m = cache.getClass().getMethod("get"	+ Utils.FirstUpperCase(eachField.getName()), cs);
+						strValue = m.invoke(cache, params).toString();
+						hash.put(eachField.getName(), strValue);
+					} catch (Exception e) {
+						log.info("",e);
+					} 
+				}
+				HSHmset(eachKey, hash);
+				HSSadd("keys:balance", eachKey);
+			}
+		}catch(Exception e){
+			log.info("",e);
+		} 
+	}
+	
+	public List<Object> getReportByUserId(String queueName,int count) throws Exception{
+		return dc.getQueueElements(queueName,count);
+	}
+	
+	public List<Object> getDeliverByUserId(String queueName,int count){
+		List<Object> result = null;
+		try {
+			result = dc.getQueueElements(queueName,count);
+		} catch (Exception e) {
+			log.error(queueName,e);
+		}
+		return result;
+	}
+	
+	/**
+	 * 根据hash key列表，获取必达短信回执对象列表
+	 *  
+	 * @param hashKeyList
+	 * @return
+	 */
+	public List<SubmitMessageArriveReply> queryArriveReplyFromRedis(List<String> hashKeyList) {
+		long time1 = System.currentTimeMillis();
+		List<SubmitMessageArriveReply> list = new ArrayList<SubmitMessageArriveReply>();
+		Jedis jedis = null;
+		try {
+			jedis = getDc().getJedis();
+			Pipeline pipeline = jedis.pipelined();
+			for (String hashKey : hashKeyList) {
+				pipeline.hvals(hashKey.getBytes());
+			}
+
+			List<Object> arriveReplyList = pipeline.syncAndReturnAll();
+			for (int i = 0; i < arriveReplyList.size(); i++) {
+				List<Object> replys = (List<Object>) arriveReplyList.get(i);
+				if (replys != null) {
+						int size = replys.size();
+						for(int j = 0 ;j < size; j ++){
+							SubmitMessageArriveReply tmp = (SubmitMessageArriveReply) ConnectUtil.Byte2Object((byte[]) replys.get(j));
+							if(tmp != null){
+								list.add(tmp);
+							} else {
+								list.add(null);
+							}
+						}
+				}
+			}
+			
+			pipeline.sync();
+		} catch (Exception e) {
+			log_info.error("queryArriveReplyFromRedis", e);
+		} finally {
+			getDc().returnJedis(jedis);
+		}
+
+		long time2 = System.currentTimeMillis();
+		if (time2 - time1 > 3000) {
+			log_info.warn("queryArriveReplyFromRedis too long time  " + (time2 - time1) + " ms");
+		}
+
+		return list;
+	}
+	
+	/**
+	 * 根据hashKey列表，循环执行如下操作<br>
+	 * 删除redis中存放某一批次必达短信回执对象<br>
+	 * 删除redis中存放某一批次必达短信时效和下发时间的键值对<br>
+	 * 
+	 * @param hashKeyList
+	 */
+	public void delArriveReplyFromRedis(List<String> hashKeyList) {
+		if(hashKeyList == null || hashKeyList.size() < 1){
+			return ;
+		}
+		
+		long time1 = System.currentTimeMillis();
+		Jedis jedis = null;
+		try {
+			jedis = getDc().getJedis();
+			Pipeline pipeline = jedis.pipelined();
+			for (String hashKey : hashKeyList) {
+				if(StringUtils.isBlank(hashKey)){
+					continue;
+				}
+				
+				//删除redis中存放某一批次必达短信回执对象
+				pipeline.del(hashKey.getBytes());
+				
+				//删除redis中存放某一批次必达短信时效和下发时间的键值对
+				String arriveNumber = hashKey.split(":")[2];
+				pipeline.hdel(must_arrive_valid_time.getBytes(), arriveNumber.getBytes());
+			}
+			pipeline.sync();
+		} catch (Exception e) {
+			log_info.error("delArriveReplyFromRedis", e);
+		} finally {
+			getDc().returnJedis(jedis);
+		}
+
+		long time2 = System.currentTimeMillis();
+		if (time2 - time1 > 3000) {
+			log_info.warn("delArriveReplyFromRedis too long time  " + (time2 - time1) + " ms");
+		}
+	}
+	
+	/**
+	 * 更新redis中必达短信回执
+	 * 
+	 * @param updateArriveReply
+	 *            更新信息实体
+	 *            
+	 * @param queueName 必达短信回执队列存放hash key
+	 * @param invaliTimeHashKey 必达短信接收时间和时效存放hash key
+	 * 
+	 * @return 0-表示更新成功，其他值失败
+	 */
+	public int updateArriveReplyFromRedis(SubmitMessageArriveReply updateArriveReply, String queueName, String invaliTimeHashKey) {
+		long time1 = System.currentTimeMillis();
+		Jedis jedis = null;
+		try {
+			jedis = getDc().getJedis();
+
+			String msgId = updateArriveReply.getMsg_id();
+			// 查找必达短信批次下发时间和时效性
+			String sendTimeAndTimeout = jedis.hget(invaliTimeHashKey, msgId);
+			if (StringUtils.isBlank(sendTimeAndTimeout)) {
+				//该key超时被清理了
+				return 1;
+			}
+
+			String[] arr = sendTimeAndTimeout.split("_");
+			if (arr.length != 2) {
+				//key对应value格式错误，正确格式: 2017-06-10 13:45:00_5
+				return 2;
+			}
+
+			if (DateUtil.subTime(arr[0], null) > Integer.valueOf(arr[1]) * 60) {
+				//该条必达短信回执已超过时效范围，不进行更新
+				return 3;
+			}
+			
+			String receTimeKey = arr[0].replaceAll("\\-| |:", "");
+			String hashKey = queueName + ":" + msgId + ":" + updateArriveReply.getUser_id() + "_" + receTimeKey + "_" + arr[1];
+			String fieldKey = updateArriveReply.getMobile();
+			byte[] smsReplyObj = jedis.hget(hashKey.getBytes(), fieldKey.getBytes());
+			if(smsReplyObj != null){
+				SubmitMessageArriveReply sms = (SubmitMessageArriveReply) ConnectUtil.Byte2Object(smsReplyObj);
+				sms.setErr_code(updateArriveReply.getErr_code());
+				sms.setErr_msg(updateArriveReply.getErr_msg());
+				sms.setRemark(updateArriveReply.getRemark());
+				sms.setMsg_report_time(updateArriveReply.getMsg_report_time());
+				sms.setUpdate_time(DateUtil.currentTime());
+				//更新该条必达短信回执
+				jedis.hset(hashKey.getBytes(), fieldKey.getBytes(), ConnectUtil.Object2Byte(sms));
+			}else{
+				//该key不存在，可能超时被清理了
+				return 1;
+			}
+		} catch (Exception e) {
+			log_info.error("updateArriveReplyFromRedis", e);
+			return 4;
+		} finally {
+			getDc().returnJedis(jedis);
+		}
+
+		long time2 = System.currentTimeMillis();
+		if (time2 - time1 > 3000) {
+			log_info.warn("updateArriveReplyFromRedis too long time  " + (time2 - time1) + " ms");
+		}
+
+		return 0;
+	}
+	
+	public List<SubmitMessageArriveReply> updateArriveReplyFromRedis(List<SubmitMessageArriveReply> replyList, String queueName, String invaliTimeHashKey) {
+		List<SubmitMessageArriveReply> updateList = new ArrayList<SubmitMessageArriveReply>();
+		if (replyList != null && replyList.size() > 0) {
+			long time1 = System.currentTimeMillis();
+			Jedis jedis = null;
+
+			try {
+				jedis = getDc().getJedis();
+				for (int i = 0; i < replyList.size(); i++) {
+					SubmitMessageArriveReply updateArriveReply = replyList.get(i);
+					if (updateArriveReply != null) {
+						try {
+							String msgId = updateArriveReply.getMsg_id();
+							String mobile = updateArriveReply.getMobile();
+							// 查找必达短信批次下发时间和时效性
+							String sendTimeAndTimeout = jedis.hget(invaliTimeHashKey, msgId);
+							if (StringUtils.isBlank(sendTimeAndTimeout)) {
+								// 该key超时被清理了
+								if (log.isDebugEnabled()) {
+									log.debug("updateArriveReplyFromRedis key maybe timeout, msgId=" + msgId + ", mobile=" + mobile);
+								}
+
+								continue;
+							}
+
+							String[] arr = sendTimeAndTimeout.split("_");
+							if (arr.length != 2) {
+								// key对应value格式错误，正确格式: 2017-06-10 13:45:00_5
+								log.error("updateArriveReplyFromRedis key's value error, msgId=" + msgId + ", mobile=" + mobile + ", " +sendTimeAndTimeout);
+
+								continue;
+							}
+
+							if (DateUtil.subTime(arr[0], null) > Integer.valueOf(arr[1]) * 60) {
+								// 该条必达短信回执已超过时效范围，不进行更新
+								if (log.isDebugEnabled()) {
+									log.debug("updateArriveReplyFromRedis key valid time over, msgId=" + msgId + ", mobile=" + mobile + "," + sendTimeAndTimeout);
+								}
+
+								continue;
+							}
+
+							String receTimeKey = arr[0].replaceAll("\\-| |:", "");
+							String hashKey = queueName + ":" + msgId + ":" + updateArriveReply.getUser_id() + "_" + receTimeKey + "_" + arr[1];
+							String fieldKey = updateArriveReply.getMobile();
+							byte[] smsReplyObj = jedis.hget(hashKey.getBytes(), fieldKey.getBytes());
+							if (smsReplyObj != null) {
+								SubmitMessageArriveReply sms = (SubmitMessageArriveReply) ConnectUtil.Byte2Object(smsReplyObj);
+								sms.setErr_code(updateArriveReply.getErr_code());
+								sms.setErr_msg(updateArriveReply.getErr_msg());
+								sms.setRemark(updateArriveReply.getRemark());
+								sms.setMsg_report_time(updateArriveReply.getMsg_report_time());
+								sms.setUpdate_time(DateUtil.currentTime());
+								// 更新该条必达短信回执
+								jedis.hset(hashKey.getBytes(), fieldKey.getBytes(), ConnectUtil.Object2Byte(sms));
+								updateList.add(updateArriveReply);
+								
+								if (log.isDebugEnabled()) {
+									log.debug("updateArriveReplyFromRedis update key, hashKey(" + hashKey + ") fieldKey(" + fieldKey + "), msgId=" + msgId + ", mobile=" + mobile);
+								}
+							} else {
+								// 该key不存在，可能超时被清理了
+								if (log.isDebugEnabled()) {
+									log.debug("updateArriveReplyFromRedis arriveReply not exist, hashKey(" + hashKey + ") fieldKey(" + fieldKey + "), msgId=" + msgId + ", mobile=" + mobile);
+								}
+
+								continue;
+							}
+						} catch (Exception e) {
+							log_info.error("updateArriveReplyFromRedis arriveReply-" + updateArriveReply.toString(), e);
+						}
+					}
+				}
+			} finally {
+				getDc().returnJedis(jedis);
+			}
+
+			long time2 = System.currentTimeMillis();
+			if (time2 - time1 > 5000) {
+				log_info.warn("updateArriveReplyFromRedis too long time  " + (time2 - time1) + " ms");
+			}
+		}
+
+		return updateList;
+	}
+	
+	/**
+	 * 根据list key，获取必达短信回执对象列表
+	 *  
+	 * @param must_arrive_reply_list 必达短信队列名称
+	 * @param size 一次获取的数量
+	 * @return 
+	 */
+	public List<SubmitMessageArriveReply> queryMustArriveReplyListFromRedis(String must_arrive_reply_list, int size) {
+		if(size < 0){
+			size = 1;
+		}
+		
+		long time1 = System.currentTimeMillis();
+		List<SubmitMessageArriveReply> list = new ArrayList<SubmitMessageArriveReply>();
+		Jedis jedis = null;
+		try {
+			jedis = getDc().getJedis();
+			Pipeline pipeline = jedis.pipelined();
+			while(size-- > 0){
+				pipeline.rpop(must_arrive_reply_list.getBytes());
+			}
+
+			List<Object> arriveReplyList = pipeline.syncAndReturnAll();
+			for (int i = 0; i < arriveReplyList.size(); i++) {
+				Object byteObj = arriveReplyList.get(i);
+				if(byteObj != null){
+					SubmitMessageArriveReply tmp = (SubmitMessageArriveReply) ConnectUtil.Byte2Object((byte[]) byteObj);
+					if(tmp != null){
+						list.add(tmp);
+					}
+				}
+			}
+			
+			pipeline.sync();
+		} catch (Exception e) {
+			log_info.error("queryMustArriveReplyListFromRedis", e);
+		} finally {
+			getDc().returnJedis(jedis);
+		}
+
+		long time2 = System.currentTimeMillis();
+		if (time2 - time1 > 3000) {
+			log_info.warn("queryMustArriveReplyListFromRedis too long time  " + (time2 - time1) + " ms");
+		}
+
+		return list;
+	}
+	
+}

@@ -1,0 +1,167 @@
+package sunnyday.controller.check;
+
+import java.util.Set;
+import java.util.regex.Pattern;
+
+import org.slf4j.Logger;
+import org.springframework.stereotype.Component;
+
+import com.hskj.utils.UtilTool;
+
+import sunnyday.common.model.ErrCode;
+import sunnyday.common.model.SmsMessage;
+import sunnyday.common.model.UserBean;
+import sunnyday.controller.cache.ErrCodeCache;
+import sunnyday.controller.cache.UserInfoCache;
+import sunnyday.controller.cache.WhiteContentCache;
+import sunnyday.controller.filter.FilterFactory;
+import sunnyday.controller.filter.IFilter;
+import sunnyday.controller.util.FilterSMSUtil;
+import sunnyday.controller.util.Md5Util;
+import sunnyday.tools.util.CommonLogFactory;
+import sunnyday.tools.util.PropertiesUtil;
+@Component
+public class ImpDoCheck_submitRepeat implements IDoCheck {
+	private Logger log = CommonLogFactory.getCommonLog("infoLog");
+	private ErrCode.codeName codeName = ErrCode.codeName.ClientRepeatFilter;
+	private ErrCode.codeName codeName_content = ErrCode.codeName.RepeatFilterContent;
+	private IFilter filter = null;
+	String name= "";
+	
+	/***
+	 * poolType@sentinels@masterName
+	 * poolType@redisServerIp@redisServerPort
+	 */
+	public ImpDoCheck_submitRepeat(){
+		String serverIp = PropertiesUtil.getPropertie("dc_deal.serverIp");
+		String serverPort = PropertiesUtil.getPropertie("dc_deal.serverPort");
+		String sentinels = PropertiesUtil.getPropertie("dc_deal.sentinels");
+		String poolType = PropertiesUtil.getPropertie("dc_deal.poolType");
+		String masterName = PropertiesUtil.getPropertie("dc_deal.masterName");
+		String pwd = PropertiesUtil.getPropertie("dc_deal.pwd");
+		if("sentinel".equalsIgnoreCase(poolType)){
+			name=poolType+"@"+sentinels+"@"+masterName+"@"+pwd;
+		}else {
+			name=poolType+"@"+serverIp+"@"+serverPort+"@"+pwd;
+		}
+	}
+	
+	@Override
+	public int doCheck(SmsMessage msg) {
+		if(log.isDebugEnabled()){
+			 log.debug("do submitRepeat  Check -> msg_id="+msg.getMsg_id()+", mobile="+msg.getMobile());
+		}
+		String filter_type = UtilTool.getFilterType();
+		if("redis".equals(filter_type)){
+			filter =  ValidationFactory.getIFilter(FilterFactory.REPEAT_FILTER_REDIS,name);
+		}else{
+			filter =  ValidationFactory.getIFilter(FilterFactory.REPEAT_FILTER_MEMCACHE,"repeatMsgFilter");
+		}
+		return repeatSubmitFilter(msg);
+	}
+	
+	private  int  repeatSubmitFilter(SmsMessage sms) {
+		long time1=System.currentTimeMillis();
+		String  mobile = sms.getMobile();
+		String src_content = sms.getComplete_content();
+		String user_id = sms.getUser_id();
+		
+		int result = 1;
+		Object filterResult = null;
+		try {
+			UserBean userInfo = UserInfoCache.getUser_info().get(user_id);
+			if (userInfo == null) {
+				userInfo = new UserBean();
+				userInfo.setIs_filter_repeat(1);
+				userInfo.setFilter_cycle(300);
+				userInfo.setRepeat_times(3);
+				userInfo.setIs_filter_repeat_content(1);
+				userInfo.setUser_id(user_id);
+			}
+			 
+			// 判断是否需要过滤 is_filter_repeat--> 1:过滤 0:不过滤
+			if (userInfo.getIs_filter_repeat() == 1) {
+				// 过滤下发信息中的
+				String content = sms.getComplete_content();
+				String tmp_content = FilterSMSUtil.filterDigit(content);
+				if (tmp_content.length() > 5) {
+					content = tmp_content;
+				}
+				String key = "first_filter:"+Md5Util.Md5_32(user_id + mobile + content+ sms.getPknumber());
+				try {
+					UtilTool.lock.lock();
+					filterResult = filter.doFilter(key,userInfo.getFilter_cycle(),userInfo.getRepeat_times() - 1);
+					if (filterResult != null) {
+						// 判断是重复下发
+						result = 0;
+						sms.setStatus(2);
+						sms.setResponse(ErrCodeCache.getErrCode(codeName).getResponse());
+						sms.setErr(String.valueOf(ErrCodeCache.getErrCode(codeName).getErr()).trim());
+						sms.setFail_desc(ErrCodeCache.getErrCode(codeName).getFail_desc());
+						long time2 = System.currentTimeMillis() - time1;
+						log.info("[submitRepeat_repeatFilter] user_id="+ user_id + ", mobile:" + mobile + ", content:"+ src_content + ", key:" + key + ", 耗时["+ time2 + "]ms");
+						return result;
+					}
+				} catch (Exception e) {
+				} finally {
+					UtilTool.lock.unlock();
+				}
+			} 
+			
+			//1.判断是否走二级过滤  1:过滤 0:不过滤
+			//2.同时判断短信内容是否命中二级拦截
+			if(filterResult==null&&userInfo.getIs_filter_repeat_content()==1) {
+				String hitWord = isNeedRepeatByMsg(src_content,user_id);
+				if(hitWord!=null){
+					//进行二次过滤
+					try {
+						String content = sms.getComplete_content();
+						String key_content = "second_filter_content:"+Md5Util.Md5_32("FilterContent"+user_id + content +sms.getMobile());
+						String key_word = "second_filter_word:"+Md5Util.Md5_32("FilterContent"+user_id + hitWord +sms.getMobile());
+						UtilTool.lock2.lock();
+						filterResult = filter.doFilter(sms.getPktotal(),key_content,key_word,userInfo.getFilter_cycle_content(),userInfo.getRepeat_times_content() - 1);
+						if(filterResult!=null){
+							//命中二级拦截
+							result = 0;
+							sms.setStatus(2);
+							sms.setResponse(ErrCodeCache.getErrCode(codeName_content).getResponse());
+							sms.setErr(String.valueOf(ErrCodeCache.getErrCode(codeName_content).getErr()).trim());
+							sms.setFail_desc(ErrCodeCache.getErrCode(codeName_content).getFail_desc()+hitWord);
+							long time2  = System.currentTimeMillis()- time1;
+							log.info("[Content_repeatFilter] user_id=" + user_id+ ", mobile:" + mobile + ", content:"+ src_content + ", hitWord:" + hitWord + ", 耗时["+ time2 + "]ms");
+						 return  result;
+					}
+					} catch (Exception e) {
+					}finally{
+						UtilTool.lock2.unlock();
+					}
+						
+				}
+			}
+
+		} catch (Exception e) {
+			log.error("",e);
+		}finally{
+			long time3 = System.currentTimeMillis() - time1;
+			if(time3>3000){
+			 log.warn("repeatFilterTimeOut is too long time ["+time3+"]ms");
+			 }
+		}
+		return  result ;
+	}
+
+	private String isNeedRepeatByMsg(String completeContent, String user_id) {
+		String result = null;
+		// 二级模板拦截模板
+		Set<Pattern[]> filterSet = WhiteContentCache.getUser_filter_content_list().get(user_id);
+		if (filterSet != null && filterSet.size() > 0) {
+			result = SmsFilter.filterContentBySplitRgex4Content(completeContent, filterSet);
+		}
+		if(log.isDebugEnabled()){
+			log.debug("completeContent:　"+completeContent+", filterSet:"+filterSet+", result:"+result);
+		}
+		
+		return result;
+
+	}
+}

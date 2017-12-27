@@ -1,0 +1,339 @@
+package sunnyday.gateway.util;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+import org.slf4j.Logger;
+import org.springframework.stereotype.Service;
+
+import sunnyday.common.model.SubmitBean;
+import sunnyday.gateway.common.BalanceValidImpl;
+import sunnyday.gateway.dc.DataCenter;
+import sunnyday.gateway.model.UserBalanceInfo;
+import sunnyday.gateway.model.UserBean;
+import sunnyday.tools.util.CommonLogFactory;
+import sunnyday.tools.util.DateUtil;
+@Service
+public class QunFaSmsServeceImpl implements ISmsService{
+	private static Logger log = CommonLogFactory.getCommonLog(QunFaSmsServeceImpl.class);
+	@Override
+	public HSResponse doSomething(CommonParameter param) {
+		//渠道码、业务账号
+		String corp_id = param.getCorp_id();
+		//密码
+		String corp_pwd = param.getCorp_pwd();
+		String requestIP = param.getRequest_ip();//访问方式,ip
+		String corp_service = param.getCorp_service();
+		String ext = param.getExt();
+		
+		String type = param.getType();
+		String method = param.getMethod();
+		@SuppressWarnings("unchecked")
+		List<SubmitBean> smsList = (List<SubmitBean>) param.getOther().get("messages");
+	
+		List<HSResponse> result_success = new ArrayList<HSResponse>();
+		List<HSResponse> result_error = new ArrayList<HSResponse>();
+		
+		
+		if(corp_id == null||"".equals(corp_id.trim())){
+			LogUtil.writeLogs(corp_id,requestIP, ErrorCodeUtil.common_user_id_error, "参数:corp_id未填写");
+			return getResponse(ErrorCodeUtil.common_user_id_error,"账号参数填写不合法",smsList);
+		}
+		
+		if(ext==null){
+			ext="";
+		}
+		
+		// 晋中银行不能用统一返回。
+		if (!type.equals(ParamUtil.HTTP_INTERFACE_SMSSEND_JZBANK)) {
+			if (smsList == null || smsList.size() < 1) {
+				LogUtil.writeLogs(corp_id, requestIP,
+						ErrorCodeUtil.common_mobile_info_error, "无待发短信");
+				return getResponse(ErrorCodeUtil.common_mobile_info_error,
+						"无待发短信", smsList, corp_id);
+			}
+//			if (smsList.size() > ParamUtil.MOBILE_COUNT_LIMIT) {
+//				LogUtil.writeLogs(corp_id, requestIP,
+//						ErrorCodeUtil.common_param_error,
+//						"手机号码数超过" + ParamUtil.MOBILE_COUNT_LIMIT + "个["
+//								+ smsList.size() + "]");
+//				return getResponse(ErrorCodeUtil.common_param_error,
+//						"手机号码数超过" + ParamUtil.MOBILE_COUNT_LIMIT + "个["
+//								+ smsList.size() + "]", smsList, corp_id);
+//			}
+		}
+		
+		
+		// 判断用户是否存在
+		UserBean userInfo = DataCenter.getUserBeanMap().get(corp_id.trim());
+		String checkUserResult = SmsServiceFactory.checkUserStatus(userInfo,requestIP, corp_id);
+		if (!checkUserResult.equals("")) {
+			if (ErrorCodeUtil.common_user_id_error.equals(checkUserResult)) {
+				LogUtil.writeLogs(corp_id, requestIP, checkUserResult, "用户["+ corp_id + "]不存在");
+				return getResponse(checkUserResult, "用户不存在",smsList);
+			} else {
+				LogUtil.writeLogs(corp_id, requestIP, checkUserResult, "用户["+ corp_id + "]已经关闭");
+				return getResponse(checkUserResult, "用户已经关闭",smsList);
+			}
+			
+		}
+		String pwd = CommonUntil.getPassword(userInfo);
+		
+		 // 圆通与晋中银行||蘑菇街--接口  zhangsl 20160406
+        if(ParamUtil.HTTP_INTERFACE_SMSSEND_YTO.equals(type)|| 
+        		type.contains("JZYH_") ||
+        		ParamUtil.HTTP_INTERFACE_SMSSEND_MGJ.equals(type)){
+        	//校验账户密码信息
+        	String tmp = MD5.convert(pwd.trim());
+    		if(corp_pwd == null || !tmp.equals(corp_pwd.trim())){
+    			 LogUtil.writeLogs(corp_id,requestIP, ErrorCodeUtil.common_user_mima_error, "密码["+corp_pwd+"]填写错误，正确密码为["+tmp+"]");
+    			 return getResponse(ErrorCodeUtil.common_user_mima_error,"密码填写错误",smsList);
+    		}
+    		corp_service = DateUtil.getCustomerYwForm(userInfo.getServiceMap());
+        } else if(ParamUtil.HTTP_INTERFACE_SMSSEND_BW.equals(type)){
+        	//校验账户密码信息
+        	String service_code = DateUtil.getCustomerYwForm(userInfo.getServiceMap(),corp_service.trim(),userInfo);
+    		if (corp_service == null || service_code == null) {
+    			LogUtil.writeLogs(corp_id,requestIP, ErrorCodeUtil.common_corpServiceError_or_statusClose, "客户业务验证失败,客户业务列表:"+userInfo.getServiceMapString()+",MD5_CODE:"+corp_service.trim());
+    			return getResponse(ErrorCodeUtil.common_corpServiceError_or_statusClose,"客户业务验证失败",smsList);
+    		}
+        } else if(ParamUtil.HTTP_INTERFACE_SMSSEND_TC.equals(type)){
+        	//校验账户密码信息
+    		if(corp_pwd == null || !pwd.equals(corp_pwd.trim())){
+    			 LogUtil.writeLogs(corp_id,requestIP, ErrorCodeUtil.common_user_mima_error, "密码["+corp_pwd+"]填写错误，正确密码为["+pwd+"]");
+    			 return getResponse(ErrorCodeUtil.common_user_mima_error,"密码填写错误",smsList);
+    		}
+    		//赋值业务信息
+    		corp_service = DateUtil.getCustomerYwForm(userInfo.getServiceMap());
+        } else if(ParamUtil.HTTP_INTERFACE_SMSSEND_SD.equals(type)){
+        	//赋值业务信息
+    		corp_service = DateUtil.getCustomerYwForm(userInfo.getServiceMap());
+        }else if(ParamUtil.WEBSERVICE_INTERFACE_SMSSEND_JD.equals(type)){
+        	//校验账户密码信息
+        	
+        	if(corp_pwd == null || !pwd.equals(corp_pwd.trim())){
+   			 LogUtil.writeLogs(corp_id,requestIP, ErrorCodeUtil.common_user_mima_error, "密码["+corp_pwd+"]填写错误，正确密码为["+pwd+"]");
+   			 return getResponse(ErrorCodeUtil.common_user_mima_error,"密码填写错误",smsList);
+   		      }
+        	//赋值业务信息
+    		corp_service = DateUtil.getCustomerYwForm(userInfo.getServiceMap());
+		} else if (ParamUtil.VERIFY_MIMA.equals(type)) {
+			if (corp_pwd == null || !pwd.equals(corp_pwd.trim())) {
+				LogUtil.writeLogs(corp_id, requestIP,ErrorCodeUtil.common_user_mima_error, "密码[" + corp_pwd+ "]填写错误，正确密码为[" + pwd + "]");
+				return getResponse(ErrorCodeUtil.common_user_mima_error,"密码填写错误", smsList);
+			}
+			corp_service = DateUtil.getCustomerYwForm(userInfo.getServiceMap());
+		} else if (ParamUtil.VERIFY_MIMA_SERVICE.equals(type)) {
+			if (corp_pwd == null ||!pwd.equals(corp_pwd.trim())) {
+				LogUtil.writeLogs(corp_id, requestIP,ErrorCodeUtil.common_user_mima_error, "密码[" + corp_pwd+ "]填写错误，正确密码为[" + pwd + "]");
+				return getResponse(ErrorCodeUtil.common_user_mima_error,"密码填写错误", smsList);
+			}
+		} else if(ParamUtil.HTTP_INTERFACE_SMSSEND_ZXJT.equals(type)){
+			if (corp_pwd == null || !pwd.equals(corp_pwd.trim())) {
+				LogUtil.writeLogs(corp_id, requestIP,ErrorCodeUtil.common_user_mima_error, "密码[" + corp_pwd+ "]填写错误");
+				return getResponse(ErrorCodeUtil.common_user_mima_error,"密码填写错误", smsList);
+			}
+		} else if(ParamUtil.HTTP_INTERFACE_SMSSEND_ZXJT_GAOTIME.equals(type)){
+			if (corp_pwd == null || !pwd.equalsIgnoreCase(corp_pwd.trim())) {
+				LogUtil.writeLogs(corp_id, requestIP,ErrorCodeUtil.common_user_mima_error, "密码[" + corp_pwd+ "]填写错误");
+				return getResponse(ErrorCodeUtil.common_user_mima_error,"密码填写错误", smsList);
+			}
+		}else {
+        	// 默认用户业务付值
+        	if(corp_service==null){
+        		corp_service = DateUtil.getCustomerYwForm(userInfo.getServiceMap());
+        	}
+        	
+    		if (corp_service == null) {
+    			LogUtil.writeLogs(corp_id,requestIP, ErrorCodeUtil.common_corpServiceError_or_statusClose, "客户业务验证失败,客户业务列表:"+userInfo.getServiceMapString()+",MD5_CODE:"+corp_service);
+    			return getResponse(ErrorCodeUtil.common_corpServiceError_or_statusClose,"客户业务验证失败",smsList);
+    		}
+        }
+		// 校验用户访问ip
+		if (!SmsServiceFactory.checkUserIP(userInfo.getUser_ip(), requestIP, corp_id)) {
+			LogUtil.writeLogs(corp_id,requestIP, ErrorCodeUtil.common_user_ip_error, "非法IP访问,所允许的IP为["+userInfo.getUser_ip()+"]");
+			return getResponse(ErrorCodeUtil.common_user_ip_error,"非法IP访问",smsList);
+		}
+			
+		
+		for(SubmitBean resultBean:smsList){
+			HSResponse response = new HSResponse();
+			String msg_id = resultBean.getMsg_id();
+			String msg_content = resultBean.getContent();
+			String mobile = resultBean.getMobilesString();
+			resultBean.setUserSn(userInfo.getSn());
+			resultBean.setMsg_format(8);
+			resultBean.setSubmit_type("SGIP");
+			resultBean.setUser_id(userInfo.getUser_id());
+			if(ParamUtil.HTTP_INTERFACE_SMSSEND_ZZBANK_BATCH.equals(type)){
+				String ext_code = resultBean.getUser_ext_code();
+				resultBean.setSp_number(corp_service+ext_code);
+			}else{
+				resultBean.setSp_number(corp_service+ext);
+			}
+			
+			String ValidResult = null;
+			
+			try{
+				String is_multi_sign = "1";
+				if(userInfo.getParamMap()!=null){
+					is_multi_sign =  (String) userInfo.getParamMap().get("is_multi_sign");
+					if(is_multi_sign==null||is_multi_sign.trim().equals("")){
+						is_multi_sign = "1";
+					}
+				}
+			
+			if(is_multi_sign.equals("0")){
+				BalanceValidImpl.Instance().valid_multi(resultBean);
+			}else{
+				BalanceValidImpl.Instance().valid(resultBean);
+			}
+			}catch(Exception e){
+				LogUtil.getReceiver_log().error("计费异常["+resultBean+"]",e);
+			}
+			
+			
+        	//msg_id长度校验
+            if(msg_id == null || msg_id.trim().length() > 50||msg_id.trim().length()==0){
+            	msg_id = DateUtil.getMsgID();//重置短信的唯一标识
+            	resultBean.setMsg_id(msg_id);
+            }
+            
+            String signature = resultBean.getSignature();
+			if(resultBean.getWith_gate_sign()==1){
+				signature = resultBean.getOperator_signature();
+			}
+			if(null == signature){
+				signature = "";
+			}
+			
+			String msg_content_new = resultBean.getContent()+signature;
+			
+			 
+			
+        	//内容长度校验
+            if(msg_content.length() == 0 || msg_content_new.length() > 1000){
+            	//单条短信不合法
+            	LogUtil.getReceiver_log().info("mobile:" + mobile +" msg_content:"+ msg_content_new.length() +" >1000 OR  =0");
+            	response.setCode(ErrorCodeUtil.common_msg_content_error_gxh+"@"+resultBean.getMsg_id()+"@"+resultBean.getUser_id()+"@"+resultBean.getMobilesString());
+				response.setText("短信内容长度不合法");
+				result_error.add(response);
+				continue;
+            }
+            
+             //入库
+            ValidResult = SmsServiceFactory.getValidResult(resultBean.getResp(), requestIP, corp_id, corp_service);
+			if(ValidResult.equals("")){
+				try {
+					LogUtil.getReceiver_log().info("receive user_id:"+corp_id+", pwd:"+corp_pwd+", corp_service:"+corp_service+ "; mobile:"+mobile+" requestIP:"+requestIP+"; td_code:"+resultBean.getTd_code()+"; method:"+method);
+					DataCenter.addSubmitListDone(resultBean);
+				} catch (Exception e) {
+					log.error("",e);
+				}
+				response.setCode("1000"+"@"+resultBean.getMsg_id()+"@"+resultBean.getUser_id()+"@"+resultBean.getMobilesString());
+				response.setText("success");
+				result_success.add(response);
+			}else{
+				//部分提交成功，返回的错误码为 code@msg_id@user_id 用@符号拼接
+				response.setCode(ValidResult+"@"+resultBean.getMsg_id()+"@"+resultBean.getUser_id()+"@"+resultBean.getMobilesString());
+				if ("-1".equals(ValidResult)) {
+					response.setText("error");
+					LogUtil.writeLogs(corp_id, requestIP, ValidResult,"未知错误，请联系研发人员");
+				} else if (ErrorCodeUtil.common_corpServiceError_or_statusClose.equals(ValidResult)) {
+					response.setText("业务匹配失败");
+					LogUtil.writeLogs(corp_id,requestIP,ValidResult,"客户业务匹配失败,客户提交参数:corp_service[" + corp_service+ "]; 客户所有业务信息为:"+ userInfo.getServiceMapString());
+				} else if (ErrorCodeUtil.hs_balance_not_enough_gxh.equals(ValidResult)) {
+					Map<String, UserBalanceInfo> map = DataCenter.getUserBalanceMap();
+					UserBalanceInfo userBalanceInfo = map.get(corp_id);
+					response.setText("余额不足");
+					if (userBalanceInfo != null) {
+						LogUtil.writeLogs(corp_id, requestIP, ValidResult,"客户余额[" + userBalanceInfo.getBalance() + "]不足");
+					} else {
+						LogUtil.writeLogs(corp_id, requestIP, ValidResult,"客户余额不足");
+					}
+				} else if(ErrorCodeUtil.common_mobile_number_error.equals(ValidResult)){
+					response.setCode(ErrorCodeUtil.common_mobile_number_error+"@"+resultBean.getMsg_id()+"@"+resultBean.getUser_id()+"@"+resultBean.getMobilesString());
+					response.setText("无效手机号码");
+					LogUtil.writeLogs(corp_id,requestIP,ValidResult,"无效手机号码["+mobile+"]");
+				}else  if(ErrorCodeUtil.common_umber_match_services_error.equals(ValidResult)){
+					response.setCode(ErrorCodeUtil.common_umber_match_services_error+"@"+resultBean.getMsg_id()+"@"+resultBean.getUser_id()+"@"+resultBean.getMobilesString());
+					response.setText("手机号码无法和业务匹配");
+					LogUtil.writeLogs(corp_id,requestIP,ValidResult,"手机号码无法和业务匹配["+mobile+"]");
+				}else  if(ErrorCodeUtil.common_no_before_sign.equals(ValidResult)){
+					response.setCode(ErrorCodeUtil.common_no_before_sign+"@"+resultBean.getMsg_id()+"@"+resultBean.getUser_id()+"@"+resultBean.getMobilesString());
+					response.setText("前置无签名");
+					LogUtil.writeLogs(corp_id,requestIP,ValidResult,"["+mobile+"]"+"内容开头无签名["+msg_content+"]");
+				}else  if(ErrorCodeUtil.common_no_after_sign.equals(ValidResult)){
+					response.setCode(ErrorCodeUtil.common_no_after_sign+"@"+resultBean.getMsg_id()+"@"+resultBean.getUser_id()+"@"+resultBean.getMobilesString());
+					response.setText("后置无签名");
+					LogUtil.writeLogs(corp_id,requestIP,ValidResult,"["+mobile+"]"+"内容结尾无签名["+msg_content+"]");
+				}else  if(ErrorCodeUtil.common_sign_no_record.equals(ValidResult)){
+					response.setCode(ErrorCodeUtil.common_sign_no_record+"@"+resultBean.getMsg_id()+"@"+resultBean.getUser_id()+"@"+resultBean.getMobilesString());
+					response.setText("签名没有报备");
+					LogUtil.writeLogs(corp_id,requestIP,ValidResult,"["+mobile+"]"+"签名没有报备["+msg_content+"]");
+				}
+				else{
+					response.setCode(ValidResult+"@"+resultBean.getMsg_id()+"@"+resultBean.getUser_id()+"@"+resultBean.getMobilesString());
+					response.setText("未定义");
+					LogUtil.writeLogs(corp_id,requestIP,ValidResult,"未定义["+mobile+"]");
+				}
+				result_error.add(response);
+			}
+		}
+		
+		return getResponse(result_success,result_error);
+	}
+
+	private HSResponse getResponse(String code,String text,List<SubmitBean> smsList,String corp_id){
+		HSResponse result = new HSResponse();
+		List<HSResponse> result_error = new ArrayList<HSResponse>();
+		if(smsList!=null&&smsList.size()>0){
+			for(SubmitBean bean:smsList){
+				HSResponse rp = new HSResponse();
+				rp.setCode(code+"@"+bean.getMsg_id()+"@"+bean.getUser_id()+"@"+bean.getMobilesString());
+				rp.setText(text);
+				result_error.add(rp);
+			}
+			
+		}else {
+				HSResponse rp = new HSResponse();
+				rp.setCode(code+"@msg_id@"+corp_id+"@mobile");
+				rp.setText("无待发短信");
+				result_error.add(rp);
+		}
+		
+		result.getOther().put("success", null);
+		result.getOther().put("error", result_error);
+		return result;
+	}
+	
+	private HSResponse getResponse(String code,String text,List<SubmitBean> smsList){
+		HSResponse result = new HSResponse();
+		List<HSResponse> result_error = new ArrayList<HSResponse>();
+		if(smsList!=null&&smsList.size()>0){
+			for(SubmitBean bean:smsList){
+				HSResponse rp = new HSResponse();
+				rp.setCode(code+"@"+bean.getMsg_id()+"@"+bean.getUser_id()+"@"+bean.getMobilesString());
+				rp.setText(text);
+				result_error.add(rp);
+			}
+			
+		} 
+		result.getOther().put("success", null);
+		result.getOther().put("error", result_error);
+		return result;
+	}
+
+	private HSResponse getResponse(List<HSResponse> result_success,List<HSResponse> result_error){
+		HSResponse result = new HSResponse();
+		if(result_success!=null&&result_success.size()>0){
+			result.setCode("1000");
+			result.setText("success");
+		}
+		result.getOther().put("success", result_success);
+		result.getOther().put("error", result_error);
+		return result;
+		
+	}
+}

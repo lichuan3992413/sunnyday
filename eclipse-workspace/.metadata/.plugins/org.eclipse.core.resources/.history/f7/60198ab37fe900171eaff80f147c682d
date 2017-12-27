@@ -1,0 +1,173 @@
+package sunnyday.gateway.model;
+
+import java.io.Serializable;
+
+/**
+ * 必达短信下发回执
+ * 
+ * @author yangxianbin    
+ * @time 2017年6月10日 上午11:33:07
+ */
+public class SubmitMessageArriveReply implements Serializable{
+
+	private static final long serialVersionUID = 6595745027878143866L;
+	
+	/** 主键 */
+	private long sn;
+	/** 业务账户ID */
+	private String user_id;
+	/** 短信下发手机号码 */
+	private String mobile;
+	/** 短信内容 */
+	private String msg_content;
+	/** 网关错误码 0和000表示下发成功，其他表示失败的错误码 */
+	private String err_code;
+	/** 网关错误码英文描述 */
+	private String err_msg;
+	/** 网关错误码中文描述 */
+	private String remark;
+	/** 必达短信批次号 */
+	private String msg_id;
+	/** 批次短信时效单位min */
+	private int arrive_time_limit;
+	/** 客户提交信息时间戳 */
+	private String msg_receive_time;
+	/** 状态报告成功匹配时间戳 */
+	private String msg_report_time;
+	/** 针对user_id+msg_id+mobile做的md5索引值 */
+	private String md5_index;
+	/** 记录入库时间 */
+	private String insert_time;
+	/** 记录最近一次更新时间 */
+	private String update_time;
+
+	public long getSn() {
+		return sn;
+	}
+
+	public void setSn(long sn) {
+		this.sn = sn;
+	}
+
+	public String getUser_id() {
+		return user_id;
+	}
+
+	public void setUser_id(String user_id) {
+		this.user_id = user_id;
+	}
+
+	public String getMobile() {
+		return mobile;
+	}
+
+	public void setMobile(String mobile) {
+		this.mobile = mobile;
+	}
+
+	public String getMsg_content() {
+		return msg_content;
+	}
+
+	public void setMsg_content(String msg_content) {
+		this.msg_content = msg_content;
+	}
+
+	public String getErr_code() {
+		return err_code;
+	}
+
+	public void setErr_code(String err_code) {
+		this.err_code = err_code;
+	}
+
+	public String getErr_msg() {
+		return err_msg;
+	}
+
+	public void setErr_msg(String err_msg) {
+		this.err_msg = err_msg;
+	}
+
+	public String getRemark() {
+		return remark;
+	}
+
+	public void setRemark(String remark) {
+		this.remark = remark;
+	}
+
+	public String getMsg_id() {
+		return msg_id;
+	}
+
+	public void setMsg_id(String msg_id) {
+		this.msg_id = msg_id;
+	}
+
+	public int getArrive_time_limit() {
+		return arrive_time_limit;
+	}
+
+	public void setArrive_time_limit(int arrive_time_limit) {
+		this.arrive_time_limit = arrive_time_limit;
+	}
+
+	public String getMsg_receive_time() {
+		return msg_receive_time;
+	}
+
+	public void setMsg_receive_time(String msg_receive_time) {
+		this.msg_receive_time = msg_receive_time;
+	}
+
+	public String getMsg_report_time() {
+		return msg_report_time;
+	}
+
+	public void setMsg_report_time(String msg_report_time) {
+		this.msg_report_time = msg_report_time;
+	}
+
+	public String getMd5_index() {
+		return md5_index;
+	}
+
+	public void setMd5_index(String md5_index) {
+		this.md5_index = md5_index;
+	}
+
+	public String getInsert_time() {
+		return insert_time;
+	}
+
+	public void setInsert_time(String insert_time) {
+		this.insert_time = insert_time;
+	}
+
+	public String getUpdate_time() {
+		return update_time;
+	}
+
+	public void setUpdate_time(String update_time) {
+		this.update_time = update_time;
+	}
+
+	@Override
+	public String toString() {
+		return "SubmitMessageArriveReply [sn=" + sn + ", user_id=" + user_id
+				+ ", mobile=" + mobile + ", msg_content=" + msg_content
+				+ ", err_code=" + err_code + ", err_msg=" + err_msg
+				+ ", remark=" + remark + ", msg_id=" + msg_id
+				+ ", arrive_time_limit=" + arrive_time_limit
+				+ ", msg_receive_time=" + msg_receive_time
+				+ ", msg_report_time=" + msg_report_time + ", md5_index="
+				+ md5_index + ", insert_time=" + insert_time + ", update_time="
+				+ update_time + "]";
+	}
+
+	public String getString() {
+		return "SubmitMessageArriveReply  msg_id=" + msg_id + ", user_id=" + user_id + ", mobile=" + mobile;
+	}
+
+}

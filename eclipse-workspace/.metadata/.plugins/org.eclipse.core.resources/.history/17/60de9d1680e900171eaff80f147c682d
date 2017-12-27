@@ -1,0 +1,12 @@
+package sunnyday.gateway.util;
+
+import javax.servlet.http.HttpServletRequest;
+
+import sunnyday.gateway.model.HSResponse;
+
+public interface ISolver {
+	public String doSolver(HttpServletRequest request);
+	public String translateErrorCode(HSResponse response);
+	public String getTargetName();
+
+}

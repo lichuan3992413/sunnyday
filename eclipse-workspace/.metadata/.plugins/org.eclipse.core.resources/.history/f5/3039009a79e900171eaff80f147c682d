@@ -1,0 +1,3 @@
+[NAME]   	    [TYPE]
+TradeCode       Char(4)
+FlowNo          Char(20)

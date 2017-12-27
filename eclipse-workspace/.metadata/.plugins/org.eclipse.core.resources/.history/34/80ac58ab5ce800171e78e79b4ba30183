@@ -1,0 +1,8 @@
+package com.hskj.iservice;
+
+import com.hskj.form.CommonParameter;
+import com.hskj.form.HSResponse;
+
+public interface  ISmsService {
+	public HSResponse doSomething(CommonParameter param);
+}

@@ -1,0 +1,6 @@
+[NAME]   	    [TYPE]
+TradeCode       Char(4)
+ProcessFlag     Char(1)
+FlowNo          Char(20)
+LogLevel        Char(1)
+LogFileName     Char(30)

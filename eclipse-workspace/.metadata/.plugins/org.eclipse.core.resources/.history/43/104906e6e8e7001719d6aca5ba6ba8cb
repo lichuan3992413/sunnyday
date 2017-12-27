@@ -1,0 +1,64 @@
+package com.hskj.threads.persistence;
+
+import java.text.SimpleDateFormat;
+import java.util.List;
+
+import org.slf4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import com.hskj.dataCenter.DataCenter_old;
+import com.hskj.form.DeliverBean;
+import com.hskj.log.CommonLogFactory;
+import com.hskj.rao.GateRAO;
+import com.hskj.thread.fremawork.ObjectWriteThread;
+import com.hskj.utils.ParamUtil;
+@Service
+public class SendDeliverProductThread extends ObjectWriteThread {
+	private Logger log = CommonLogFactory.getCommonLog("infoLog");
+	
+	@Value("#{config.send_deliver_queue_name}")
+	private String send_deliver_queue_name;
+	@Autowired
+	private GateRAO rao = null;
+	SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss,SSS");
+	
+	public void initConfigParam(){
+		this.setTimeInterval(500);
+	}
+	@Override
+	protected Object getOneMessage() {
+		DeliverBean deliver = DataCenter_old.getDealedDeliver();
+		return deliver;
+	}
+	@Override
+	protected String getGroupKey(Object smsObj) {
+		DeliverBean sms = (DeliverBean)smsObj;
+		String key = sms.getUser_id();
+		return key;
+	}
+
+	@Override
+	protected void writeList(List<Object> list) {
+		if(list != null && list.size() > 0){
+			DeliverBean tmp = (DeliverBean)list.get(0);
+			String user_id = tmp.getUser_id();
+			if(user_id != null){
+				String queue = send_deliver_queue_name.replace("user_id", user_id);
+				int count =0;
+				boolean result = false;
+				while (!result&&count<5) {
+					rao.HSSADD(ParamUtil.REDIS_SET_SEND_KEY, queue);
+					result=rao.submitMessageToDc(queue, list);
+					count++;
+				}
+				if(log.isDebugEnabled()){
+					log.debug("product some deliver to dataCenter [" + list.size() + "条]： " + list);
+				}
+			}
+//			
+		}
+	}
+	
+}

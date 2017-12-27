@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:util="http://www.springframework.org/schema/util"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+	http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-3.0.xsd
+	http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util-3.0.xsd">
+	
+	<util:properties id="config"  location="file:D:/codes/eclipse-workspace/controller/config/dealdata.config.properties"/>
+	<util:properties id="dealGroup"   location="file:D:/codes/eclipse-workspace/controller/config/dealGroup.pro"/>
+	<util:properties id="dealSingle"  location="file:D:/codes/eclipse-workspace/controller/config/dealSingle.pro"/>
+	 
+	
+	<context:property-placeholder location="file:D:/codes/eclipse-workspace/controller/config/db.properties,
+	                                        file:D:/codes/eclipse-workspace/controller/config/important.properties" />
+	
+	
+	
+	<context:annotation-config />
+	<context:component-scan base-package="sunnyday"/>
+	
+	<bean id="dataSource" class="com.alibaba.druid.pool.DruidDataSource" init-method="init" destroy-method="close">
+	<!-- 配置初始化大小、最小、最大 -->
+	<property name="url" value="${db.url}" />
+	<property name="username" value="${db.username}" />
+	<property name="password" value="${db.password}" />
+	<property name="initialSize" value="${db.initialSize}" />
+	<property name="minIdle" value="${db.minIdle}" />
+	<property name="maxActive" value="${db.maxActive}" />
+	<!-- 配置获取连接等待超时的时间 -->
+	<property name="maxWait" value="${db.maxWait}" />
+	<!-- 配置间隔多久才进行一次检测，检测需要关闭的空闲连接，单位是毫秒 -->
+	<property name="timeBetweenEvictionRunsMillis" value="60000" />
+	<property name="minEvictableIdleTimeMillis" value="120000" />
+	<!-- 检查超时不可用连接 -->
+	<!-- 
+	<property name="validationQuery" value="${db.query}" />
+	 -->
+	<property name="testWhileIdle" value="true" />
+	<property name="testOnBorrow" value="false" />
+	<property name="testOnReturn" value="false" />
+	<property name="removeAbandoned" value="true" /> <!-- 打开removeAbandoned功能 -->
+	<property name="removeAbandonedTimeout" value="180" /> <!-- 180秒，也就是3分钟 -->
+	<property name="logAbandoned" value="true" /> <!-- 关闭abanded连接时输出错误日志 -->
+		
+	</bean>
+	 
+	<bean id="redisCli" class="sunnyday.adapter.redis.impl.RedisDcAdapter" init-method="initPool">
+		<property name="redisServerIp" value="${dc_gate.serverIp}" />
+		<property name="redisServerPort" value="${dc_gate.serverPort}" />
+		<property name="maxTotal" value="${dc_gate.maxTotal}" />
+		<property name="maxIdle" value="${dc_gate.maxIdle}" />
+		<property name="maxWaitMillis" value="${dc_gate.maxWaitMillis}"></property>
+		<property name="testOnBorrow" value="true"></property>
+		
+		<property name="sentinels" value="${dc_gate.sentinels}"></property>
+		<property name="poolType" value="${dc_gate.poolType}"></property>
+		<property name="masterName" value="${dc_gate.masterName}"></property>
+		<property name="pwd" value="${dc_gate.pwd}"></property>
+	</bean>
+</beans>

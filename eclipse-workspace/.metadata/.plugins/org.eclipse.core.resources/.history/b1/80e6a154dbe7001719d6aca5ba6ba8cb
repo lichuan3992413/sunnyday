@@ -1,0 +1,43 @@
+package com.hskj.dao.oracle;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+
+import org.springframework.stereotype.Repository;
+
+import com.hskj.dao.IFileDAO;
+import com.hskj.dao.commonUtils.DBUtil;
+
+/**
+ *
+ * Description:  文件回传相关操作DAO
+ * 0 插入时的状态
+ * 10 读取之后的状态
+ * 100 传输完成
+ */
+
+@Repository(value="oracle_FileDAO")
+public class FileDAO extends SimpleDAO implements IFileDAO{
+	public void insertFileInfoBi(String file_name, int sms_size, int status, int file_type){
+		String sql = "insert into file_info_bi (sn, file_name, try_times ,\"size\" ,status,file_type,insert_time ,update_time)" +
+				" values(s_file_info_bi.nextval, ? ,0, ? ,?, ?,sysdate ,sysdate)";
+		Connection conn = null;
+		PreparedStatement prep = null;
+		try {
+			conn = dataSource.getConnection();
+			prep = conn.prepareStatement(sql);
+			prep.setString(1, file_name);
+			prep.setInt(2, sms_size);
+			prep.setInt(3, status);
+			prep.setInt(4, file_type);
+			prep.execute();
+			conn.commit();
+		} catch (SQLException e) {
+			log.error("" , e);
+			e.printStackTrace();
+		}finally{
+			DBUtil.freeConnection(conn, prep);
+		}
+	}
+}

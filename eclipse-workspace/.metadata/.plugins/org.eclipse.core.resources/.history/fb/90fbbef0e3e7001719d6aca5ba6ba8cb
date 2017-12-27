@@ -1,0 +1,86 @@
+package com.hskj.callableTask;
+
+import java.util.List;
+import java.util.concurrent.Callable;
+
+import org.slf4j.Logger;
+
+import com.hskj.dao.IMessageDAO;
+import com.hskj.form.SubmitMessageArriveReply;
+import com.hskj.log.CommonLogFactory;
+import com.hskj.utils.Md5Util;
+
+/**
+ * 必达短信回执入库
+ * 
+ * @author 71604057
+ * @time 2017年6月11日 上午9:30:29
+ */
+public class ArriveReplyListInDBTask implements Callable<Integer> {
+
+	private Logger log = CommonLogFactory.getCommonLog("infoLog");
+	
+	private List<SubmitMessageArriveReply> arriveReplyList;
+	private IMessageDAO dao;
+
+	public ArriveReplyListInDBTask(IMessageDAO dao, List<SubmitMessageArriveReply> arriveReplyList) {
+		this.dao = dao;
+		this.arriveReplyList = arriveReplyList;
+	}
+
+	@Override
+	public Integer call() throws Exception {
+		long time1 = System.currentTimeMillis();
+		
+		//该批必达短信回执列表批量入库
+		saveArriveReplyFromRedis(arriveReplyList);
+
+		long time2 = System.currentTimeMillis();
+		if (time2 - time1 > 5000) {
+			log.info("ArriveReplyListInDBTask too long time [" + (time2 - time1) + "] ms ");
+		}
+		
+		return null;
+	}
+
+	/**
+	 * 从arriveReplyList中必达短信回执取出存入Submit_Message_Arrive_Reply表中
+	 */
+	private void saveArriveReplyFromRedis(List<SubmitMessageArriveReply> arriveReplyList) {
+		if(arriveReplyList == null || arriveReplyList.isEmpty()){
+			return ;
+		}
+
+		try {
+			long time1 = System.currentTimeMillis();
+			for (int i = 0; i < arriveReplyList.size(); i++) {
+				SubmitMessageArriveReply sms = arriveReplyList.get(i);
+				if (sms != null) {
+					sms.setMd5_index(Md5Util.md5((sms.getMsg_id() + sms.getUser_id() + sms.getMobile()).getBytes()));
+				}
+			}
+
+			//重试3次
+			int trys = 3;
+			while(trys -- > 0){
+				try {
+					dao.insertSubmitMessageArriveReplyList(arriveReplyList);
+					trys = 0;
+				} catch (Exception e) {
+					Thread.sleep(1000);
+					if(trys == 0){
+						throw e;
+					}
+				}
+			}
+
+			long time2 = System.currentTimeMillis();
+			if ((time2 - time1) > 5000) {
+				log.warn("insertSubmitMessageArriveReplyList [" + arriveReplyList.size() + "]too long time [" + (time2 - time1) + "]ms ");
+			}
+		} catch (Exception e) {
+			log.error("saveArriveReplyFromRedis - " + arriveReplyList, e);
+		}
+	}
+
+}

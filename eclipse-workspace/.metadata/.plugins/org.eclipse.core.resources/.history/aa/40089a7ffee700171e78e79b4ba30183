@@ -1,0 +1,22 @@
+package sunnyday.controller.check;
+
+import org.springframework.stereotype.Component;
+
+import com.hskj.dataCenter.cache.ErrCodeCache;
+import com.hskj.form.ErrCode;
+import com.hskj.form.SmsMessage;
+
+@Component
+public class ImpDoCheck_reject implements IDoCheck {
+	private ErrCode.codeName codeName = ErrCode.codeName.ChildCountReject;
+	
+	@Override
+	public int doCheck(SmsMessage sms) {
+		sms.setStatus(2);
+		sms.setResponse(ErrCodeCache.getErrCode(codeName).getResponse());
+		sms.setErr(String.valueOf(ErrCodeCache.getErrCode(codeName).getErr()));
+		sms.setFail_desc(ErrCodeCache.getErrCode(codeName).getFail_desc());
+		return 0;
+	}
+
+}

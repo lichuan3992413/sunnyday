@@ -1,0 +1,6 @@
+[NAME]   	[TYPE]
+ulLen		Ulong(4)
+ulNum       Ulong(4)
+ulStblockID Ulong(4)
+ulBlockNum  Ulong(4)
+sDataBuf    Char(8000)

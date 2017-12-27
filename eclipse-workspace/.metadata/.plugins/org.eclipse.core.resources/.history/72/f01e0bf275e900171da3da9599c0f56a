@@ -1,0 +1,98 @@
+package sunnyday.gateway.thread;
+
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+
+import org.slf4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import com.hskj.control.Stoppable;
+import com.hskj.datacenter.DataCenter;
+import com.hskj.form.SubmitBean;
+import com.hskj.log.CommonLogFactory;
+import com.hskj.rao.CommonRAO;
+
+@Service
+public class SaveSubmitDoneListThread extends Thread implements Stoppable{
+	private Logger log = CommonLogFactory.getLog("infoLog");
+	@Autowired
+	private CommonRAO dao = null;
+	/**
+	 * 单次处理提交队列中的条数
+	 */
+	@Value("#{config.getQueueCount}")
+	private String queryCount;
+	
+	/**
+	 *账户级队列超过该值会被写入文件中
+	 */
+	 
+	private static String redis_count="50000";
+
+	private boolean running = false;
+	@Value("#{config.submitQueueName}")
+	private String name = "submitDoneList";//redis提交队列前缀名称
+	
+	private ExecutorService saveSubmitDoneListPool = new ThreadPoolExecutor(Runtime.getRuntime().availableProcessors(), Runtime.getRuntime().availableProcessors()+2, 60,TimeUnit.SECONDS, DataCenter.getSaveSubmitDoneListWorkQueue());
+	
+	@Override
+	public void run() {
+		running = true ;
+		while (running) {
+			List<SubmitBean> sendList = DataCenter.getSubmitListDone(Integer.parseInt(queryCount.trim()));
+			try {
+				/**
+				 * 下发完成，待匹配的数据队列写入到redis
+				 */
+				if(sendList!=null&&sendList.size()>0){
+					boolean flag = true;
+					while (flag) {
+						flag = false;
+						int size = DataCenter.getSaveSubmitDoneListWorkQueue().remainingCapacity();
+						if (size <= 20) {
+							Thread.sleep(1000);
+							log.warn("SaveSubmitDoneListThread[" + size + "]   Capacity is <= 20 .");
+							flag = true;
+							continue;
+						}
+					}
+					if (!saveSubmitDoneListPool.isShutdown()) {
+						saveSubmitDoneListPool.submit(new SaveSubmitDoneTask(dao,sendList,name));
+					 }
+				}else{
+					sleep(300);
+				}
+				 
+			} catch (Exception e) {
+			} 
+		}
+	}
+
+	@Override
+	public boolean doStop() {
+		running = false;
+		return  true;
+	}
+
+	public static int getRedis_count() {
+		int count = 100000;
+		try{
+			
+			if(redis_count!=null&&(!redis_count.trim().equals(""))){
+				count = Integer.parseInt(redis_count);
+			}
+		}catch(Exception e){
+			
+		}
+		return count;
+	}
+
+	public void setRedis_count(String redis_count) {
+		SaveSubmitDoneListThread.redis_count = redis_count;
+	}
+
+}

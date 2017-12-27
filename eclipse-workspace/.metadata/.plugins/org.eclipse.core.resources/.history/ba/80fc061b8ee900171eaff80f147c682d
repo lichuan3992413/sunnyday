@@ -1,0 +1,10 @@
+package sunnyday.gateway.service;
+
+import sunnyday.common.model.SubmitBean;
+
+public interface BalanceVerifiable{
+	
+	public int valid(SubmitBean submitBean);
+	public int valid_multi(SubmitBean submitBean);
+	public int do_valid(SubmitBean submitBean);
+}

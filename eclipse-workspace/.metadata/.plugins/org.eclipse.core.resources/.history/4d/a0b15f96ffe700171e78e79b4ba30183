@@ -1,0 +1,274 @@
+package com.hskj.repeatFilter2;
+
+import java.util.Date;
+
+import org.slf4j.Logger;
+
+import com.danga.MemCached.MemCachedClient;
+import com.hskj.common.utils.ProUtil;
+import com.hskj.log.CommonLogFactory;
+import com.hskj.repeatFilter.IFilter;
+import com.hskj.repeatFilter.MemcachePool;
+
+public class MemcacheRepeatMsgFilter implements IFilter {
+
+	private  Logger log = CommonLogFactory.getCommonLog(MemcacheRepeatMsgFilter.class);
+	private static MemCachedClient client = null;
+	private static MemcachePool memcachePool = null;
+	private static boolean is_filter = true;
+	private static long lastFilterTime = 0l;
+	private static long lastFilterTime_2 = 0l;
+	private static boolean is_filter_2 = true;
+	
+	@Override
+	public void doStart(String filterName) {
+		try {
+			memcachePool = new MemcachePool(ProUtil.getAddr(), ProUtil.getWeight());
+			if (memcachePool.isReady()) {
+				if (memcachePool.isStart()) {
+					memcachePool.shutdown();
+				}
+				memcachePool.startUp();
+				try {
+					client = memcachePool.getCachedClient();
+					client.setPrimitiveAsString(true);
+					is_filter = true;
+				} catch (Exception e) {
+					log.info("-------------- MemcachePool has not start -------------- ");
+					log.error("",e);
+				}
+				log.info("-------------- Repeat cache start ----------------");
+			}else{
+				log.info("-------------- MemcachePool has not init -------------- ");
+			}
+		} catch (Exception e) {
+			log.error("",e);
+		}
+
+	}
+
+	@Override
+	public void doStop() {
+		log.info("-------------- Repeat cache write back start -------------- ");
+		memcachePool.shutdown();
+	}
+
+	 
+	@Override
+	public Object doFilter(String key_content, int idleSecond, int repeatTime) {
+		String result = null;
+		String memcache_value = "";
+		long amount = 0;
+		long current_time = System.currentTimeMillis();
+		if (!is_filter && (current_time - lastFilterTime) > 10 * 1000) {
+			// 如果已经10秒钟没有过滤了，再尝试开始过滤
+			is_filter = true;
+		}
+		if (is_filter) {
+			long t0 = System.currentTimeMillis();
+			boolean haskey_content = false;
+			boolean setResult = false;
+			// 1.首先判断短信内容是否已经加入过滤
+			try {
+				haskey_content = client.keyExists(key_content);
+				log.debug("[repeatFilter1]1. do client.keyExists["+ key_content + "]-> " + haskey_content);
+			} catch (Exception e) {
+				log.error("", e);
+			}
+
+			if (!haskey_content) {
+				// 短信模板不在缓存中,直接允许下发，长短信把缓存信息
+				memcache_value = CacheValueUtil.getValueElement(1, current_time);
+			} else {
+				/**
+				 * 取出缓存的关键字，命中的次数 1.若没有达到命中次数，短信内容是否已经在缓存中： 
+				 * （1）若在缓存中本次过滤不在进行次数累加
+				 * （2）若没在缓存开始计数+1 2.达到命中上限，则直接拦截
+				 */
+				memcache_value = (String) client.get(key_content);
+				if (memcache_value != null) {
+					amount = CacheValueUtil.getValue(memcache_value, 0); // 已经存在的次数
+					long frist_time = CacheValueUtil.getValue(memcache_value, 1);
+					long time_difference = (current_time - frist_time) / 1000; // 过滤时间间隔
+
+					log.debug("[repeatFilter1] ----------  距离最早下发记录的时间差："+ time_difference + " 秒");
+					log.debug("[repeatFilter1] amount=" + amount+ ", time_difference=" + time_difference+ ",idleSecond=" + idleSecond + ",repeatTime="+ repeatTime);
+
+					if (time_difference <idleSecond) {
+						if (amount >= repeatTime) {
+							result = amount + "_" + memcache_value;
+							memcache_value = CacheValueUtil.getValueElement((amount + 1), current_time);
+						} else {
+							// 不拦截 计数+1
+							memcache_value = CacheValueUtil.getValueElement((amount + 1), current_time);
+						}
+					} else {
+						log.debug("[repeatFilter1]首条下发成功记录超时，移除,key= "+ key_content);
+						memcache_value = CacheValueUtil.getValueElement(1,current_time);
+						//setResult = client.set(key_content, "1", new Date(idleSecond * 1000));
+					}
+				}
+
+			}
+			try {
+				// 重置拦截内容
+				setResult = client.set(key_content, memcache_value, new Date(idleSecond * 1000));
+			} catch (Exception e) {
+				log.error("", e);
+			}
+
+			if (!setResult) {
+				log.warn("[repeatFilter1]setResult_is_false ,不再进行拦截 ,key= " + key_content);
+				is_filter = false;
+			}
+			long t1 = System.currentTimeMillis();
+			lastFilterTime = t1;
+			if (t1 - t0 > 100) {
+				log.info("[repeatFilter1]filter time out[" + (t1 - t0) + "] ms! -------------- ,key= " + key_content);
+			}
+		}
+		log.debug("4.[repeatFilter1] get [" + key_content + "],memcache_value=" + memcache_value + ",amount=" + amount + ",result-> [" + result + "]");
+		//System.out.println("[repeatFilter1] get [" + key_content + "],memcache_value=" + memcache_value + ",amount=" + amount + ",result-> [" + result + "]");
+		return result;
+	}
+	
+	@Override
+	public Object doFilter(int pk_toal,String key_content, String key_word, int idleSecond,int repeatTime) {
+		String result = null;
+		String memcache_value = "";
+		String longsms_value = "1";
+		int tmp_longsms_value = 1;
+		long amount = 0;
+		long current_time = System.currentTimeMillis();
+		if(!is_filter_2 && (current_time - lastFilterTime_2) > 10 * 1000){
+			//如果已经10秒钟没有过滤了，再尝试开始过滤
+			is_filter_2 = true;
+		}
+		if(is_filter_2){
+			long t0 = System.currentTimeMillis();
+			boolean haskey_content= false ;
+			boolean haskey_word= false ;
+			boolean setResult = false;
+			 
+			//1.首先判断短信内容是否已经加入过滤
+			try {
+				haskey_content = client.keyExists(key_content);
+				haskey_word = client.keyExists(key_word);
+				log.debug("[repeatFilter2]1.1 do client.keyExists["+key_content+"]-> "+haskey_content);
+				log.debug("[repeatFilter2]1.2 do client.keyExists["+key_word+"]-> "+haskey_word);
+			} catch (Exception e) {
+				log.error("",e);
+			}
+			
+			if (!haskey_word) {
+				//短信模板不在缓存中,直接允许下发，长短信把缓存信息
+				memcache_value = CacheValueUtil.getValueElement(1, current_time);
+				if(pk_toal>1){
+					setResult = client.set(key_content, "1", new Date(idleSecond * 1000)); 
+				} 
+				
+			}else {
+				/**
+				 * 取出缓存的关键字，命中的次数
+				 * 1.若没有达到命中次数，短信内容是否已经在缓存中：
+				 * （1）若在缓存中本次过滤不在进行次数累加
+				 * （2）若没在缓存开始计数+1
+				 * 2.达到命中上限，则直接拦截
+				 */
+				memcache_value = (String) client.get(key_word);
+				try {
+					if(haskey_content){
+						longsms_value =  (String) client.get(key_content);
+					} 
+					
+					tmp_longsms_value = Integer.parseInt(longsms_value);
+				} catch (Exception e) {
+					log.error("",e);
+				}
+				
+				//System.out.println("longsms_value: "+longsms_value);
+				if (memcache_value != null) {
+					//log.debug("[repeatFilter2]memcache_value: "+memcache_value);
+					amount = CacheValueUtil.getValue(memcache_value,0); //已经存在的次数
+					long frist_time = CacheValueUtil.getValue(memcache_value,1);
+					long time_difference = (current_time - frist_time) / 1000; //过滤时间间隔
+
+					log.debug("[repeatFilter2] ----------  距离最早下发记录的时间差：" + time_difference + " 秒");
+					log.debug("[repeatFilter2] amount="+amount+", time_difference="+time_difference+",idleSecond="+idleSecond+",repeatTime="+repeatTime);
+					
+					if(time_difference < idleSecond){
+						if(amount >= repeatTime){
+							if(pk_toal>1){
+								//长短信没有被缓存，直接拦截
+								if(!haskey_content){
+									result = amount + "_" + memcache_value;
+									memcache_value = CacheValueUtil.getValueElement((amount+1), current_time);
+								}else {
+									tmp_longsms_value++;
+									//int num = (tmp_longsms_value+pk_toal-1)/pk_toal;
+									int mode = (tmp_longsms_value%pk_toal);
+									if(mode==0){
+										memcache_value = CacheValueUtil.getValueElement(1+amount, current_time);
+									} 
+									if(tmp_longsms_value > (repeatTime-1)*pk_toal){
+										result = amount + "_" + memcache_value;
+									 }
+									setResult = client.set(key_content, String.valueOf(tmp_longsms_value), new Date(idleSecond * 1000)); 
+									//System.out.println("1.num="+num+",mode="+mode+",tmp_longsms_value="+tmp_longsms_value);
+								}
+							}else {
+								//短短信直接拦截
+								result = amount + "_" + memcache_value;
+								memcache_value = CacheValueUtil.getValueElement((amount+1), current_time);
+							}
+						}else{
+							if(pk_toal>1){
+								//长短信放入缓存中 并计数+1
+								if(!haskey_content){
+									setResult = client.set(key_content, "1", new Date(idleSecond * 1000)); 
+									memcache_value = CacheValueUtil.getValueElement((amount+1), current_time);
+								}else {
+									tmp_longsms_value++;
+									int num = (tmp_longsms_value+pk_toal-1)/pk_toal;
+									int mode = (tmp_longsms_value%pk_toal);
+									if(mode==0&&num>1){
+									   memcache_value = CacheValueUtil.getValueElement(1+amount, current_time);
+									} 
+									//System.out.println("2.->num="+num+",mode="+mode+",tmp_longsms_value="+tmp_longsms_value);
+									setResult = client.set(key_content, String.valueOf(tmp_longsms_value), new Date(idleSecond * 1000)); 
+								}
+							}else {
+								//短短信直不拦截 计数+1
+								memcache_value = CacheValueUtil.getValueElement((amount+1), current_time);
+							}
+						}
+					}else {
+						log.debug("[repeatFilter2]首条下发成功记录超时，移除,key= "+key_word);
+						memcache_value = CacheValueUtil.getValueElement(1,current_time);
+						setResult = client.set(key_content, "1", new Date(idleSecond * 1000)); 
+					}
+				}
+				 
+			}
+			try {
+				 //重置拦截内容
+				setResult = client.set(key_word, memcache_value, new Date(idleSecond * 1000));
+			} catch (Exception e) {
+				log.error("",e);
+			}
+			
+			if(!setResult){
+				log.warn("[repeatFilter2]setResult_is_false ,不再进行拦截 ,key= "+key_word);
+				is_filter_2 = false;
+			}
+			long t1 = System.currentTimeMillis();
+			lastFilterTime_2 = t1;
+			if(t1 - t0 > 100){
+				log.info("[repeatFilter2]filter time out["+(t1 - t0 )+"] ms! -------------- ,key= "+key_word);
+			}
+		}
+		log.debug("4.[repeatFilter2] get ["+key_content+"],memcache_value="+memcache_value+",tmp_longsms_value="+tmp_longsms_value+",amount="+amount+",repeatTime="+repeatTime+",result-> ["+result+"]");
+		//System.out.println("4.[repeatFilter2] get ["+key_content+"],memcache_value="+memcache_value+",tmp_longsms_value="+tmp_longsms_value+",amount="+amount+",repeatTime="+repeatTime+",result-> ["+result+"]");
+		return result;
+	}
+}

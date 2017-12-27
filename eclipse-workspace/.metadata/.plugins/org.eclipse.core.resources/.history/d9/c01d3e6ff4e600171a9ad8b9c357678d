@@ -1,0 +1,66 @@
+package sunnyday.tools.util;
+
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import org.slf4j.Logger;
+import org.apache.commons.lang.time.DateFormatUtils;
+
+public class DateUtil {
+	
+	private static final Logger log = CommonLogFactory.getLog("infoLog");
+	
+	private static int seq = 0;
+	public static String getCurrentDateString(String style){
+		return new SimpleDateFormat(style).format(new Date());
+	}
+	  
+	public static synchronized String getFileName(){
+		SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MMdd/HHmms");
+		return sdf.format(System.currentTimeMillis()) + System.currentTimeMillis() + "_" + (int)(Math.random() * 10000) + ".sms";
+	}
+	/**
+	 * yyyy-MM-dd
+	 * @return
+	 */
+	public static synchronized String currentDate(){
+		SimpleDateFormat sdf5 = new SimpleDateFormat("yyyy-MM-dd");
+		return sdf5.format(new Date(System.currentTimeMillis()));
+	}
+	
+	public static synchronized String getFilePrefix(){
+		SimpleDateFormat sdf2 = new SimpleDateFormat("yyyyMMddHHmmss");
+		return sdf2.format(System.currentTimeMillis()) + (seq++)%10000 ;
+	}
+	public static synchronized long diffTime(String time1,String time2){
+		long time = 0l;
+		try {
+			SimpleDateFormat sdf4 = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss,SSS");
+			time = (sdf4.parse(time2)).getTime()-(sdf4.parse(time1)).getTime();
+		} catch (Exception e) {
+			log.error("", e);
+		}
+		return time;
+	}
+	/**
+	 * yyyy-MM-dd HH:mm:ss
+	 * @return
+	 */
+	public static synchronized String currentTime() {
+		SimpleDateFormat sdf3 = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+		return sdf3.format(new Date(System.currentTimeMillis()));
+	}
+
+	public static synchronized String currentTimeToMs(){
+		
+		return  DateFormatUtils.format(new Date(), "yyyy-MM-dd HH:mm:ss,SSS");
+		
+	} 
+	
+	public static synchronized String msToDateFormat(long millis){
+		SimpleDateFormat sdf3 = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+		return sdf3.format(millis);
+	}
+	public static synchronized long getcurrentTime(){
+		return System.currentTimeMillis();
+	}
+}

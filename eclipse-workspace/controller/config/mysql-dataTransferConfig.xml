@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<dataTransporter>
+        <default>
+                <dbName>cluster_server</dbName>
+                <timeColumn>insert_time</timeColumn>
+                <fixedTime>02:00:00</fixedTime>
+        </default>
+  <mission>
+                <sourceTable>report_message</sourceTable>
+                <destTable>report_message_cache</destTable>
+                <primaryKey>sn</primaryKey>
+                <whereCondition>send_status != 2</whereCondition>
+                <limitCondition>500</limitCondition>
+                <intervalTime>20</intervalTime>
+        </mission>
+        
+      <mission>
+                <sourceTable>submit_message_send_history</sourceTable>
+                <destTable>submit_msg_send_his_cache</destTable>
+                <primaryKey>sn</primaryKey>
+                <limitCondition>500</limitCondition>
+                <intervalTime>20</intervalTime>
+        </mission>
+
+       <mission>
+                <sourceTable>deliver_message</sourceTable>
+                <destTable>deliver_message_YYYYMM</destTable>
+                <primaryKey>sn</primaryKey>
+                <whereCondition>send_status != 2</whereCondition>
+                <limitCondition>500</limitCondition>
+                <intervalTime>300</intervalTime>
+        </mission>
+               
+          <mission>
+                <sourceTable>report_message_cache</sourceTable>
+                <primaryKey>sn</primaryKey>
+                <limitCondition>500</limitCondition>
+                <intervalTime>20</intervalTime>
+        </mission> 
+                        
+        <mission>
+                <sourceTable>submit_mass_message_cache</sourceTable>
+                <primaryKey>sn</primaryKey>
+                <whereCondition>check_time &lt; sysdate - 2</whereCondition>
+                <limitCondition>500</limitCondition>
+                <fixedTime>04:30:00</fixedTime>
+                <timeColumn>check_time</timeColumn>
+       </mission>
+       
+           <mission>
+                <sourceTable>submit_message_check_cache</sourceTable>
+                <primaryKey>submit_sn</primaryKey>
+                <limitCondition>500</limitCondition>
+                <intervalTime>5</intervalTime>
+       </mission>
+       
+       <mission>
+                <sourceTable>submit_msg_check_group_cache</sourceTable>
+                <primaryKey>sn</primaryKey>
+                <timeColumn>check_time</timeColumn>
+                <limitCondition>500</limitCondition>
+                <intervalTime>5</intervalTime>
+       </mission>
+       
+       <mission>
+                <sourceTable>submit_message_long</sourceTable>
+                <destTable>submit_message_long_cache</destTable>
+                <primaryKey>submit_sn</primaryKey>
+                <limitCondition> 500 </limitCondition>
+                <whereCondition>insert_time &lt; sysdate - 1</whereCondition>
+                <intervalTime>60</intervalTime>
+       </mission>
+       <mission>
+                <sourceTable> submit_message_long_cache </sourceTable>
+                <primaryKey>submit_sn</primaryKey>
+                <limitCondition> 500 </limitCondition>
+                <timeColumn>insert_time</timeColumn>
+       </mission>
+    
+        <mission>
+                <sourceTable>submit_msg_send_his_cache</sourceTable>
+                <primaryKey>sn</primaryKey>
+                <limitCondition>500</limitCondition>
+                <intervalTime>20</intervalTime>
+        </mission>
+
+         <mission>
+                <sourceTable> submit_message_test_cache </sourceTable>
+                <primaryKey>submit_sn</primaryKey>
+                <limitCondition> 500 </limitCondition>
+                <timeColumn>insert_time</timeColumn>
+        </mission>
+        <mission>
+                <sourceTable>receive_report_info_cache</sourceTable>
+                <primaryKey>sn</primaryKey>
+                <limitCondition> 500 </limitCondition>
+                <intervalTime>20</intervalTime>
+        </mission>
+        
+        
+         <mission>
+                <sourceTable>send_message_timing</sourceTable>
+                <destTable>send_message_timing_history</destTable>
+                <primaryKey>sn</primaryKey>
+                <limitCondition> 500 </limitCondition>
+                <whereCondition>send_status !=0</whereCondition>
+                <intervalTime>60</intervalTime>
+       </mission>
+       
+       
+        <mission>
+                <sourceTable>send_message_timing_history</sourceTable>
+                <destTable>send_message_timing_YYYYMM</destTable>
+                <primaryKey>sn</primaryKey>
+                <limitCondition> 500 </limitCondition>
+                <whereCondition>to_date(send_time,'yyyy-MM-dd hh24:mi:ss') &lt; sysdate - 10</whereCondition>
+                <intervalTime>60</intervalTime>
+       </mission>
+       
+       <mission>
+                <sourceTable>msg_timing_batch_detail</sourceTable>
+                <destTable>msg_timing_batch_detail_YYYYMM</destTable>
+                <primaryKey>sn</primaryKey>
+                <limitCondition> 500 </limitCondition>
+                <whereCondition>to_date(send_time,'yyyy-MM-dd hh24:mi:ss') &lt; sysdate - 10</whereCondition>
+                <intervalTime>60</intervalTime>
+       </mission>
+         
+
+		<mission>
+				<sourceTable> statistics_hour </sourceTable>
+				<destTable>statistics_hour_YYYYMM</destTable>
+				<primaryKey>sn</primaryKey>
+				<whereCondition>to_date(send_time,'yyyy-MM-dd hh24')&lt;trunc(add_months(sysdate,-3))</whereCondition>
+				<timeColumn>send_time</timeColumn>
+				<limitCondition> 500 </limitCondition>
+		</mission>
+
+		<mission>
+				<sourceTable> statistics_min </sourceTable>
+				<destTable>statistics_min_YYYYMM</destTable>
+				<primaryKey>sn</primaryKey>
+				<whereCondition>to_date(send_time,'yyyy-MM-dd hh24:mi')&lt;trunc(add_months(sysdate,-3))</whereCondition>
+				<timeColumn>send_time</timeColumn>
+				<limitCondition> 500 </limitCondition>
+		</mission>
+		<mission>
+				<sourceTable> submit_history_statistic </sourceTable>
+				<destTable>submit_his_statistic_YYYYMM</destTable>
+				<primaryKey>sn</primaryKey>
+				<whereCondition>update_time&lt;trunc(add_months(sysdate,-3))</whereCondition>
+				<timeColumn>update_time</timeColumn>
+				<limitCondition> 500 </limitCondition>
+		</mission>
+		
+		<mission>
+				<sourceTable>interact_msg_batch</sourceTable>
+				<destTable>interact_msg_batch_YYYYMM</destTable>
+				<primaryKey>sn</primaryKey>
+				<whereCondition> TO_DATE(send_time,'yyyy-MM-dd hh24:mi:ss') &lt; sysdate - interval '3' month</whereCondition>
+				<timeColumn>send_time</timeColumn>
+				<limitCondition> 1000 </limitCondition>
+		</mission>
+		
+		 <mission>
+                <sourceTable>check_message_cache</sourceTable>
+                <primaryKey>sn</primaryKey>
+                <limitCondition>500</limitCondition>
+                <intervalTime>500</intervalTime>
+       </mission>
+       
+        <mission>
+                <sourceTable>check_msg_batch_history</sourceTable>
+		    <destTable>check_msg_batch_history_YYYYMM</destTable>
+                <primaryKey>sn</primaryKey>
+                <timeColumn>check_time</timeColumn>
+                <limitCondition>500</limitCondition>
+                <intervalTime>500</intervalTime>
+       </mission>
+      <mission>
+                <sourceTable>submit_message_disturb_cache </sourceTable>
+                <primaryKey>submit_sn</primaryKey>
+                <limitCondition> 500 </limitCondition>
+                <timeColumn>disturb_insert_time</timeColumn>
+        </mission>
+
+
+		<!--<mission>
+			<sourceTable>statistic_template_day</sourceTable>
+			<destTable>statistic_template_day_YYYYMM</destTable>
+			<primaryKey>sn</primaryKey>
+			<whereCondition>to_date(insert_time,'YYYY-MM-DD
+				HH24:MI:SS')&lt;trunc(add_months(sysdate,-3))</whereCondition>
+			<limitCondition>500</limitCondition>
+		</mission>-->
+		
+</dataTransporter>

@@ -1,0 +1,72 @@
+#Encoding utf-8
+#关联任务配置文件（不建议修改）
+dataSyncConfigPath = ./config/receiver.syncTaskConfig.cfg
+#队列过大时，文件回写的路径（不建议修改）
+filePath = ./server_file/
+#客户状态报告队列公共名称（不建议修改）
+reportQueueName = q:report:
+#客户上行队列公共名称（不建议修改）
+deliverQueueName = q:deliver:
+#推送或者自取完成的状态报告队列（不建议修改）
+reportRespQueueName = q:reportFin
+#推送或者自取完成的上行队列（不建议修改）
+deliverRespQueueName =q:deliverFin
+#单次加载上行状态报告以判断是否超时的最大值（不建议修改）
+getQueueCount= 1000
+#服务http协议监听的端口
+http_port = 8088
+#服务webServices协议监听的端口
+webServices_port = 8083
+#服务https协议监听的端口
+https_port = 8443
+#访问webServices服务时，紧跟在端口后的路径地址
+context_path = /sms
+#webServices对应的war文件的绝对路径
+api_path = ./sendApi
+#webServices临时工作目录
+directory_path = ./web_temp_1
+#单次读取文件中的数量
+read_file_count=100
+#账户级redis队列超过该值会被写入文件中
+user_redis_count=100000
+#单次写文件处理条数
+write2filecount=5000
+#redis提交队列名称
+submitQueueName=submitDoneList
+#必达短信回执队列存放hash key
+must_arrive_reply=arrive:mustArriveReply
+#必达短信接收时间和时效存放hash key
+must_arrive_valid_time=arrive:valid_time
+#必达短信回执存放队列名称
+must_arrive_reply_list=arrive:arriveReplyList
+#war 临时工作文件
+tmp_path=./web_temp_2
+#war文件的绝对路径地址
+war_path=
+#war_path=/opt/sms/cluster_server/sendApi/sms-baixin.war
+#war_path=D:/Users/Administrator/workspace_sms_bx/cluster-server-baixin/sendApi/sms.war
+
+##南京银行定制配置
+#南京银行动帐重定向短信队列名称
+njyhRedirectSmsQueueName = njyh_redirect_accno_queue
+#南京银行微信通知消息队列名称
+njyhWechatNoticeQueueName = njyh_wechat_queue
+#南京银行借贷汇总执行任务队列
+njyhBorrowingNoticeQueueName = njyh_borrowing_queue
+
+#南京银行tftp配置文件路径
+njyh_tftp_config_dir=Z:/workspace/cluster-server/tftpConfig/njyh_borrowing/
+#南京银行tftp接收文件路径，以/结尾
+njyh_tftp_files=Z:/workspace/cluster-server/tftpConfig/njyh_borrowing_files/
+#互金tftp配置文件路径
+hujin_tftp_config_dir=Z:/workspace/cluster-server/tftpConfig/hujin_borrowing/
+#互金tftp接收文件路径，以/结尾
+hujin_tftp_files=Z:/workspace/cluster-server/tftpConfig/hujin_borrowing_files/
+#客户短信批量下发，配置文件路径
+xml_tftp_config_dir=Z:/workspace/cluster-server/tftpConfig/sms_receive_xml/
+#客户短信批量下发，接收文件路径，以/结尾
+xml_tftp_files=Z:/workspace/cluster-server/tftpConfig/sms_receive_xml_files/
+#客户短信批量下发，配置文件路径
+soap_tftp_config_dir=Z:/workspace/cluster-server/tftpConfig/sms_receive_soap/
+#客户短信批量下发，接收文件路径，以/结尾
+soap_tftp_files=Z:/workspace/cluster-server/tftpConfig/sms_receive_soap_files/

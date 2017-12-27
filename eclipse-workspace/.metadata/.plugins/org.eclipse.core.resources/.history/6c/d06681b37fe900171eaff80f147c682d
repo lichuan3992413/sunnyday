@@ -1,0 +1,31 @@
+package sunnyday.gateway.model;
+
+import java.io.Serializable;
+
+public class SolverResponse implements Serializable{
+	private static final long serialVersionUID = 4819798249247088570L;
+	private String result ;
+	private String content_type ;
+	
+	
+	
+	@Override
+	public String toString() {
+		return "SolverResponse [result=" + result + ", content_type="
+				+ content_type + "]";
+	}
+	public String getResult() {
+		return result;
+	}
+	public void setResult(String result) {
+		this.result = result;
+	}
+	public String getContent_type() {
+		return content_type;
+	}
+	public void setContent_type(String content_type) {
+		this.content_type = content_type;
+	}
+	
+
+}

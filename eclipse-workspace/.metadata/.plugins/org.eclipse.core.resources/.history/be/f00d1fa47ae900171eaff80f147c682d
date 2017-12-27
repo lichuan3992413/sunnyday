@@ -1,0 +1,8 @@
+package sunnyday.gateway.util;
+
+import sunnyday.gateway.model.CommonParameter;
+import sunnyday.gateway.model.HSResponse;
+
+public interface  ISmsService {
+	public HSResponse doSomething(CommonParameter param);
+}

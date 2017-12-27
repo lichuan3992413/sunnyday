@@ -1,0 +1,17 @@
+package com.hskj.dao;
+
+import org.springframework.stereotype.Repository;
+
+import com.hskj.form.DeliverMxRecord;
+
+@Repository
+public interface IDeliverMxRecordDAO {
+
+	public DeliverMxRecord queryDeliverMxRecordByMobile(String mobile);
+	
+	public int deleteDeliverMxRecord(String mobile);
+	
+	public boolean addDeliverMxRecord(DeliverMxRecord deliverMxRecord);
+	
+	public boolean updateDeliverMxRecord(DeliverMxRecord deliverMxRecord);
+}

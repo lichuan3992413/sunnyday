@@ -1,0 +1,5 @@
+[NAME]   	    [TYPE]
+TradeCode       Char(4)
+FlowNo          Char(20)
+OperationId     Char(2)
+RemainDate      Char(3)
