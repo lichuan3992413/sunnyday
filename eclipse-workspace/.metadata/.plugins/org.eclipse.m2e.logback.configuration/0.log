@@ -9520,3 +9520,4 @@ org.eclipse.core.runtime.CoreException: Launch configuration test references clo
 2017-12-26 00:21:57,398 [Worker-58] INFO  o.e.m.c.i.embedder.EclipseLogger - skip non existing resourceDirectory D:\codes\eclipse-workspace\gateway\src\main\resources
 2017-12-26 00:21:57,399 [Worker-58] INFO  o.e.m.c.i.embedder.EclipseLogger - Using 'UTF-8' encoding to copy filtered resources.
 2017-12-26 00:21:57,399 [Worker-58] INFO  o.e.m.c.i.embedder.EclipseLogger - skip non existing resourceDirectory D:\codes\eclipse-workspace\gateway\src\test\resources
+2017-12-27 23:25:45,705 [Worker-5] INFO  c.g.t.t.d.PublishedGradleVersions - Gradle version information cache is up-to-date. Trying to read.
