@@ -1,4 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<session version="1.0">
-<refactoring comment="Copy element &apos;Spring.java&apos; to &apos;tools/src/main/java/sunnyday.tools.util&apos;&#x0D;&#x0A;- Original project: &apos;common-util&apos;&#x0D;&#x0A;- Destination element: &apos;tools/src/main/java/sunnyday.tools.util&apos;&#x0D;&#x0A;- Original element: &apos;com.hskj.spring.Spring.java&apos;" description="Copy compilation unit" destination="=tools/src\/main\/java&lt;sunnyday.tools.util" element1="/src\/main\/java&lt;com.hskj.spring{Spring.java" files="0" flags="589830" folders="0" id="org.eclipse.jdt.ui.copy" policy="org.eclipse.jdt.ui.copyResources" stamp="1514002102808" units="1" version="1.0"/>
-</session>

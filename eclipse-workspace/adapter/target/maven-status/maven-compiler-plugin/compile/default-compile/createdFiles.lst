@@ -1,5 +1,0 @@
-sunnyday\adapter\redis\impl\Utils.class
-sunnyday\adapter\redis\exception\NoSuchQueueException.class
-sunnyday\adapter\redis\DCAdapter.class
-sunnyday\adapter\redis\impl\RedisDcAdapter.class
-sunnyday\adapter\redis\Chargable.class

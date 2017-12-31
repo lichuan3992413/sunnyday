@@ -1,4 +1,0 @@
-[NAME]   	[TYPE]
-ulLen		Ulong(4)
-sKeyBuf		Char(2048)
-blank       Char(4)

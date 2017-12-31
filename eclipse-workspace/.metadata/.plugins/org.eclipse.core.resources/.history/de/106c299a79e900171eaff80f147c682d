@@ -1,8 +1,0 @@
-[NAME]   	[TYPE]
-ulLen		Ulong(4)
-ulNum       Ulong(4)
-ulStblockID Ulong(4)
-ulBlockNum  Ulong(4)
-sMac        Char(128)  
-sDataBuf    Char(8008)
-blank       Char(4)

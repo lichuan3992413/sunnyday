@@ -1,5 +1,0 @@
-package sunnyday.channel.thread;
-
-public interface Task {
-	public boolean isFinshed();
-}

@@ -1,8 +1,0 @@
-package sunnyday.gateway.util;
-
-import com.hskj.form.CommonParameter;
-import com.hskj.form.HSResponse;
-
-public interface  ISmsService {
-	public HSResponse doSomething(CommonParameter param);
-}

@@ -1,5 +1,0 @@
-package sunnyday.tools.util;
-
-public interface Task {
-	public boolean isFinshed();
-}

@@ -1,5 +1,0 @@
-package com.hskj.iservice;
-
-public interface Task {
-	public boolean isFinshed();
-}
